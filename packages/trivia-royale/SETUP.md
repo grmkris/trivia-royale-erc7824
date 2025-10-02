@@ -1,6 +1,6 @@
 # Setup Guide - Trivia Royale
 
-Complete step-by-step guide to set up and run the Trivia Royale game with Yellow SDK on Base Sepolia testnet.
+Complete step-by-step guide to set up and run the Trivia Royale game with Yellow SDK on Sepolia testnet.
 
 ## 📋 Prerequisites
 
@@ -105,19 +105,19 @@ Generated 6 wallets:
 
 ### Step 3: Fund Wallets with Testnet ETH
 
-You need Base Sepolia testnet ETH for gas fees.
+You need Sepolia testnet ETH for gas fees.
 
-#### Option A: Coinbase Faucet (Recommended)
+#### Option A: Chainlink Faucet (Recommended)
 
-1. Visit [Coinbase Faucet](https://portal.cdp.coinbase.com/products/faucet)
-2. Select **Base Sepolia**
+1. Visit [Chainlink Sepolia Faucet](https://faucets.chain.link/sepolia)
+2. Connect your wallet or enter address
 3. Enter each wallet address from Step 2
-4. Request tokens (~0.2 ETH per wallet)
+4. Request tokens (~0.5 ETH per wallet)
 
 #### Option B: Alternative Faucets
 
-- [Alchemy Base Faucet](https://www.alchemy.com/faucets/base-sepolia)
-- [QuickNode Faucet](https://faucet.quicknode.com/base/sepolia)
+- [Alchemy Sepolia Faucet](https://www.alchemy.com/faucets/ethereum-sepolia)
+- [QuickNode Sepolia Faucet](https://faucet.quicknode.com/ethereum/sepolia)
 
 **How much do you need?**
 - **Minimum**: 0.1 ETH per wallet (6 wallets = 0.6 ETH total)
@@ -262,13 +262,13 @@ GAME END:
 
 ### Network Configuration
 
-The project is configured for **Base Sepolia** testnet:
+The project is configured for **Sepolia** testnet:
 
 ```typescript
 // .env
-CHAIN_ID=84532
-NETWORK=base-sepolia
-RPC_URL=https://sepolia.base.org
+CHAIN_ID=11155111
+NETWORK=sepolia
+RPC_URL=https://rpc.ankr.com/eth_sepolia
 CLEARNODE_URL=wss://testnet-clearnode.nitrolite.org
 ```
 
@@ -335,7 +335,7 @@ Before running with real Yellow SDK:
 
 **Solutions**:
 - Verify wallet has valid private key
-- Check network configuration (chain ID 84532)
+- Check network configuration (chain ID 11155111)
 - Try regenerating wallets
 
 ## 📚 Additional Resources
@@ -345,10 +345,10 @@ Before running with real Yellow SDK:
 - [Nitrolite GitHub](https://github.com/erc7824/nitrolite)
 - [ERC-7824 Specification](https://erc7824.org/erc-7824)
 
-### Base Sepolia
-- [Coinbase Faucet](https://portal.cdp.coinbase.com/products/faucet)
-- [Base Sepolia Explorer](https://sepolia.basescan.org/)
-- [RPC Endpoint](https://sepolia.base.org)
+### Sepolia
+- [Chainlink Faucet](https://faucets.chain.link/sepolia)
+- [Sepolia Explorer](https://sepolia.etherscan.io/)
+- [RPC Endpoint](https://rpc.ankr.com/eth_sepolia)
 
 ### Community
 - [Yellow Discord](https://discord.gg/yellownetwork)

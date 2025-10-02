@@ -34,7 +34,7 @@ import {
   type Chain,
   type ParseAccount,
 } from "viem";
-import { baseSepolia } from "viem/chains";
+import { sepolia } from "viem/chains";
 
 // ==================== TYPES ====================
 
@@ -82,7 +82,7 @@ export async function createNitroliteClient(
   config: YellowConfig
 ): Promise<NitroliteClient> {
   const publicClient = createPublicClient({
-    chain: baseSepolia,
+    chain: sepolia,
     transport: http(config.rpcUrl),
   });
 
@@ -173,8 +173,8 @@ export async function authenticateClearNode(
       // Step 1: Send auth request
       const authRequest = await createAuthRequestMessage({
         address: account.address,
-        chain_id: baseSepolia.id,
-        });
+        chain_id: sepolia.id,
+      });
 
       ws.send(authRequest);
       console.log(`  📤 Sent auth request for ${account.address}`);

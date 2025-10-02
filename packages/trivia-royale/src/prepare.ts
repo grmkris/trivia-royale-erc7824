@@ -10,13 +10,13 @@
 
 import { createPublicClient, createWalletClient, http, formatEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { baseSepolia } from "viem/chains";
+import { sepolia } from "viem/chains";
 import { connectToClearNode } from "./yellow-integration";
 
 // ==================== CONFIG ====================
 const CONFIG = {
-  chainId: 84532,
-  rpcUrl: "https://sepolia.base.org",
+  chainId: 11155111,
+  rpcUrl: "https://rpc.ankr.com/eth_sepolia",
   clearNodeUrl: "wss://testnet-clearnode.nitrolite.org",
 };
 
@@ -61,7 +61,7 @@ function generateWallets() {
  */
 async function checkBalance(address: string) {
   const publicClient = createPublicClient({
-    chain: baseSepolia,
+    chain: sepolia,
     transport: http(CONFIG.rpcUrl),
   });
 
@@ -137,8 +137,8 @@ async function main() {
 
   if (needsFunding) {
     console.log("\n⚠️  WALLETS NEED FUNDING\n");
-    console.log("Get Base Sepolia ETH from the faucet:");
-    console.log("  🔗 https://portal.cdp.coinbase.com/products/faucet\n");
+    console.log("Get Sepolia ETH from the faucet:");
+    console.log("  🔗 https://faucets.chain.link/sepolia\n");
     console.log("Fund these addresses:\n");
 
     wallets.forEach((wallet, index) => {
