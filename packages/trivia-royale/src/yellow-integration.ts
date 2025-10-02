@@ -172,8 +172,13 @@ export async function authenticateClearNode(
     try {
       // Step 1: Send auth request
       const authRequest = await createAuthRequestMessage({
-        address: account.address,
-        chain_id: sepolia.id,
+        wallet: account.address,
+        participant: account.address,
+        app_name: "Trivia Royale",
+        expire: (Math.floor(Date.now() / 1000) + 3600).toString(),
+        scope: "game",
+        application: account.address,
+        allowances: [],
       });
 
       ws.send(authRequest);
@@ -394,10 +399,10 @@ export async function closeGameSession(
 ): Promise<void> {
   console.log("\n  🔒 Closing game session...");
 
-  const closeMsg = await createCloseAppSessionMessage(signer, {
-    sessionId,
+  const closeMsg = await createCloseAppSessionMessage(signer, [{
+    app_session_id: sessionId,
     allocations: finalAllocations,
-  });
+  }]);
 
   ws.send(closeMsg);
   console.log("  ✅ Session close request sent");
@@ -414,6 +419,7 @@ export function createMessageSigner(wallet: WalletClient) {
 
     return await wallet.signMessage({
       message: typeof message === "string" ? message : JSON.stringify(message),
+      account: wallet.account,
     });
   };
 }
