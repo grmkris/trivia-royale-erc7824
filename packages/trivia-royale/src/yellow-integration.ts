@@ -172,8 +172,8 @@ export async function authenticateClearNode(
     try {
       // Step 1: Send auth request
       const authRequest = await createAuthRequestMessage({
-        wallet: account.address,
-        participant: account.address,
+        address: account.address,
+        session_key: account.address,
         app_name: "Trivia Royale",
         expire: (Math.floor(Date.now() / 1000) + 3600).toString(),
         scope: "game",
@@ -196,9 +196,10 @@ export async function authenticateClearNode(
 
             // Step 3: Sign challenge and send verification
             const authVerify = await createAuthVerifyMessage(
-              async (message: any) => {
+              async (message) => {
                 // MessageSigner implementation
                 return await wallet.signMessage({
+                  account,
                   message: typeof message === "string" ? message : JSON.stringify(message),
                 });
               },
@@ -321,7 +322,7 @@ export async function createGameSession(
     console.log("\n  🎮 Creating game session...");
 
     try {
-      const sessionMsg = await createAppSessionMessage(signer, [{
+      const sessionMsg = await createAppSessionMessage(signer, {
         definition: {
           protocol: "nitroliterpc",
           participants,
@@ -331,7 +332,7 @@ export async function createGameSession(
           nonce: Date.now(),
         },
         allocations: initialAllocations,
-      }]);
+      });
 
       // Send message
       ws.send(sessionMsg);
@@ -399,10 +400,10 @@ export async function closeGameSession(
 ): Promise<void> {
   console.log("\n  🔒 Closing game session...");
 
-  const closeMsg = await createCloseAppSessionMessage(signer, [{
+  const closeMsg = await createCloseAppSessionMessage(signer, {
     app_session_id: sessionId,
     allocations: finalAllocations,
-  }]);
+  });
 
   ws.send(closeMsg);
   console.log("  ✅ Session close request sent");
