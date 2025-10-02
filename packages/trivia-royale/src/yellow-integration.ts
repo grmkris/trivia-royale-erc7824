@@ -19,6 +19,7 @@ import {
   createApplicationMessage,
   createCloseAppSessionMessage,
   type CreateAppSessionRequestParams,
+  type StateSigner,
 } from "@erc7824/nitrolite";
 import {
   createPublicClient,
@@ -28,8 +29,12 @@ import {
   type WalletClient,
   type PublicClient,
   type Hex,
+  type Transport,
+  type Account,
+  type Chain,
+  type ParseAccount,
 } from "viem";
-import { polygonAmoy } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 
 // ==================== TYPES ====================
 
@@ -41,6 +46,7 @@ export interface YellowConfig {
     custody: Address;
     adjudicator: Address;
     token: Address;
+    guestAddress: Address;
   };
 }
 
@@ -67,35 +73,50 @@ export interface AppSessionInfo {
 
 // ==================== CLIENT CREATION ====================
 
+type RequiredWalletClient = WalletClient<Transport, Chain, ParseAccount<Account>>
 /**
  * Create a NitroliteClient for a participant
  */
 export async function createNitroliteClient(
-  wallet: WalletClient,
+  walletClient: RequiredWalletClient,
   config: YellowConfig
 ): Promise<NitroliteClient> {
   const publicClient = createPublicClient({
-    chain: polygonAmoy,
+    chain: baseSepolia,
     transport: http(config.rpcUrl),
   });
 
   // TODO: Need to implement StateSigner
   // For now, this is a placeholder
-  const stateSigner = {
-    signState: async (state: any) => {
+  const stateSigner: StateSigner = {
+    getAddress: () => {
+      const account = walletClient.account;
+      return account.address;
+    },
+    signRawMessage: async (message) => {
+      const account = walletClient.account;
+      return await walletClient.signMessage({
+        account,
+        message: typeof message === "string" ? message : JSON.stringify(message),
+      });
+    },
+    signState: async (channelId, state) => {
       // This will need proper implementation
-      const account = wallet.account;
+      const account = walletClient.account;
       if (!account) throw new Error("No account found");
 
       // Sign the state hash
       // This is simplified - actual implementation needs proper state hash calculation
-      return "0x" as Hex;
+      return await walletClient.signMessage({
+        account,
+        message: typeof state === "string" ? state : JSON.stringify(state),
+      });
     },
   };
 
   return new NitroliteClient({
     publicClient,
-    walletClient: wallet as any,
+    walletClient,
     stateSigner,
     addresses: config.contractAddresses,
     chainId: config.chainId,
@@ -152,8 +173,8 @@ export async function authenticateClearNode(
       // Step 1: Send auth request
       const authRequest = await createAuthRequestMessage({
         address: account.address,
-        chain_id: polygonAmoy.id,
-      });
+        chain_id: baseSepolia.id,
+        });
 
       ws.send(authRequest);
       console.log(`  📤 Sent auth request for ${account.address}`);

@@ -1,13 +1,13 @@
 import { NitroliteClient } from "@erc7824/nitrolite";
 import { createWalletClient, http, type Address, type WalletClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { polygonAmoy } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 import { keccak256, encodePacked } from "viem";
 
 // ==================== CONFIG ====================
 const CONFIG = {
-  chainId: 80002, // Polygon Amoy
-  rpcUrl: "https://rpc-amoy.polygon.technology",
+  chainId: 84532, // Base Sepolia
+  rpcUrl: "https://sepolia.base.org",
   clearNodeUrl: "wss://testnet-clearnode.nitrolite.org",
   // These will be discovered from the SDK or set manually
   contractAddresses: {
@@ -82,7 +82,7 @@ function createWallet(privateKey: `0x${string}`): WalletClient {
   const account = privateKeyToAccount(privateKey);
   return createWalletClient({
     account,
-    chain: polygonAmoy,
+    chain: baseSepolia,
     transport: http(CONFIG.rpcUrl),
   });
 }

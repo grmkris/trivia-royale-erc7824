@@ -10,13 +10,13 @@
 
 import { createPublicClient, createWalletClient, http, formatEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { polygonAmoy } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 import { connectToClearNode } from "./yellow-integration";
 
 // ==================== CONFIG ====================
 const CONFIG = {
-  chainId: 80002,
-  rpcUrl: "https://rpc-amoy.polygon.technology",
+  chainId: 84532,
+  rpcUrl: "https://sepolia.base.org",
   clearNodeUrl: "wss://testnet-clearnode.nitrolite.org",
 };
 
@@ -57,11 +57,11 @@ function generateWallets() {
 // ==================== BALANCE CHECKING ====================
 
 /**
- * Check MATIC balance for an address
+ * Check ETH balance for an address
  */
 async function checkBalance(address: string) {
   const publicClient = createPublicClient({
-    chain: polygonAmoy,
+    chain: baseSepolia,
     transport: http(CONFIG.rpcUrl),
   });
 
@@ -90,7 +90,7 @@ async function main() {
   });
 
   // Step 2: Check Balances
-  console.log("\n\n2️⃣  Checking MATIC Balances...\n");
+  console.log("\n\n2️⃣  Checking ETH Balances...\n");
 
   let totalBalance = 0n;
   const balances: { name: string; address: string; balance: bigint }[] = [];
@@ -108,14 +108,14 @@ async function main() {
       const hasBalance = balance > 0n;
       const icon = hasBalance ? "✅" : "❌";
       console.log(
-        `${icon} ${wallet.name}: ${formatEther(balance)} MATIC`
+        `${icon} ${wallet.name}: ${formatEther(balance)} ETH`
       );
     } catch (error) {
       console.log(`❌ ${wallet.name}: Error checking balance`);
     }
   }
 
-  console.log(`\n   Total: ${formatEther(totalBalance)} MATIC`);
+  console.log(`\n   Total: ${formatEther(totalBalance)} ETH`);
 
   // Step 3: Test ClearNode Connection
   console.log("\n\n3️⃣  Testing ClearNode Connectivity...\n");
@@ -137,16 +137,16 @@ async function main() {
 
   if (needsFunding) {
     console.log("\n⚠️  WALLETS NEED FUNDING\n");
-    console.log("Get Polygon Amoy MATIC from the faucet:");
-    console.log("  🔗 https://faucet.polygon.technology/\n");
+    console.log("Get Base Sepolia ETH from the faucet:");
+    console.log("  🔗 https://portal.cdp.coinbase.com/products/faucet\n");
     console.log("Fund these addresses:\n");
 
     wallets.forEach((wallet, index) => {
       console.log(`${index + 1}. ${wallet.name}: ${wallet.address}`);
     });
 
-    console.log("\n💡 Tip: You need at least 0.1 MATIC per wallet for gas fees");
-    console.log("        Recommended: 0.2 MATIC per wallet\n");
+    console.log("\n💡 Tip: You need at least 0.1 ETH per wallet for gas fees");
+    console.log("        Recommended: 0.2 ETH per wallet\n");
   } else {
     console.log("\n✅ Wallets are funded!\n");
     console.log("You can now:");

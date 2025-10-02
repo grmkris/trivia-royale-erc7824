@@ -1,6 +1,6 @@
 # Setup Guide - Trivia Royale
 
-Complete step-by-step guide to set up and run the Trivia Royale game with Yellow SDK on Polygon Amoy testnet.
+Complete step-by-step guide to set up and run the Trivia Royale game with Yellow SDK on Base Sepolia testnet.
 
 ## 📋 Prerequisites
 
@@ -103,30 +103,30 @@ Generated 6 wallets:
 
 **Save these private keys!** You'll need them for testing.
 
-### Step 3: Fund Wallets with Testnet MATIC
+### Step 3: Fund Wallets with Testnet ETH
 
-You need Polygon Amoy testnet MATIC for gas fees.
+You need Base Sepolia testnet ETH for gas fees.
 
-#### Option A: Polygon Faucet (Recommended)
+#### Option A: Coinbase Faucet (Recommended)
 
-1. Visit [Polygon Faucet](https://faucet.polygon.technology/)
-2. Select **Polygon Amoy**
+1. Visit [Coinbase Faucet](https://portal.cdp.coinbase.com/products/faucet)
+2. Select **Base Sepolia**
 3. Enter each wallet address from Step 2
-4. Request tokens (~0.2 MATIC per wallet)
+4. Request tokens (~0.2 ETH per wallet)
 
 #### Option B: Alternative Faucets
 
-- [Alchemy Polygon Faucet](https://mumbaifaucet.com/)
-- [QuickNode Faucet](https://faucet.quicknode.com/polygon/amoy)
+- [Alchemy Base Faucet](https://www.alchemy.com/faucets/base-sepolia)
+- [QuickNode Faucet](https://faucet.quicknode.com/base/sepolia)
 
 **How much do you need?**
-- **Minimum**: 0.1 MATIC per wallet (6 wallets = 0.6 MATIC total)
-- **Recommended**: 0.2 MATIC per wallet (6 wallets = 1.2 MATIC total)
+- **Minimum**: 0.1 ETH per wallet (6 wallets = 0.6 ETH total)
+- **Recommended**: 0.2 ETH per wallet (6 wallets = 1.2 ETH total)
 
 **Why?**
-- Channel creation: ~0.05 MATIC (one-time, on-chain)
-- Channel closing: ~0.03 MATIC (one-time, on-chain)
-- Buffer: ~0.02 MATIC for safety
+- Channel creation: ~0.05 ETH (one-time, on-chain)
+- Channel closing: ~0.03 ETH (one-time, on-chain)
+- Buffer: ~0.02 ETH for safety
 
 ### Step 4: Configure Environment (Optional)
 
@@ -156,16 +156,16 @@ bun run --filter @trivia-royale/game prepare
 
 You should see:
 ```
-2️⃣  Checking MATIC Balances...
+2️⃣  Checking ETH Balances...
 
-✅ Alice: 0.2 MATIC
-✅ Bob: 0.2 MATIC
-✅ Charlie: 0.2 MATIC
-✅ Diana: 0.2 MATIC
-✅ Eve: 0.2 MATIC
-✅ AI Host: 0.2 MATIC
+✅ Alice: 0.2 ETH
+✅ Bob: 0.2 ETH
+✅ Charlie: 0.2 ETH
+✅ Diana: 0.2 ETH
+✅ Eve: 0.2 ETH
+✅ AI Host: 0.2 ETH
 
-   Total: 1.2 MATIC
+   Total: 1.2 ETH
 ```
 
 ### Step 6: Run Game Simulation
@@ -262,13 +262,13 @@ GAME END:
 
 ### Network Configuration
 
-The project is configured for **Polygon Amoy** testnet:
+The project is configured for **Base Sepolia** testnet:
 
 ```typescript
 // .env
-CHAIN_ID=80002
-NETWORK=polygon-amoy
-RPC_URL=https://rpc-amoy.polygon.technology
+CHAIN_ID=84532
+NETWORK=base-sepolia
+RPC_URL=https://sepolia.base.org
 CLEARNODE_URL=wss://testnet-clearnode.nitrolite.org
 ```
 
@@ -288,7 +288,7 @@ Contract addresses will be:
 Before running with real Yellow SDK:
 
 - [ ] Wallets generated
-- [ ] All 6 wallets funded with MATIC
+- [ ] All 6 wallets funded with ETH
 - [ ] ClearNode connection successful
 - [ ] Game simulation runs
 - [ ] Contract addresses confirmed
@@ -307,11 +307,11 @@ Before running with real Yellow SDK:
 
 ### "Insufficient funds for gas"
 
-**Problem**: Wallets don't have enough MATIC
+**Problem**: Wallets don't have enough ETH
 
 **Solutions**:
 - Fund wallets from faucet (Step 3)
-- Need at least 0.1 MATIC per wallet
+- Need at least 0.1 ETH per wallet
 - Wait a few minutes after requesting from faucet
 
 ### "Channel creation failed"
@@ -335,7 +335,7 @@ Before running with real Yellow SDK:
 
 **Solutions**:
 - Verify wallet has valid private key
-- Check network configuration (chain ID 80002)
+- Check network configuration (chain ID 84532)
 - Try regenerating wallets
 
 ## 📚 Additional Resources
@@ -345,10 +345,10 @@ Before running with real Yellow SDK:
 - [Nitrolite GitHub](https://github.com/erc7824/nitrolite)
 - [ERC-7824 Specification](https://erc7824.org/erc-7824)
 
-### Polygon Amoy
-- [Polygon Faucet](https://faucet.polygon.technology/)
-- [Amoy Explorer](https://amoy.polygonscan.com/)
-- [RPC Endpoint](https://rpc-amoy.polygon.technology)
+### Base Sepolia
+- [Coinbase Faucet](https://portal.cdp.coinbase.com/products/faucet)
+- [Base Sepolia Explorer](https://sepolia.basescan.org/)
+- [RPC Endpoint](https://sepolia.base.org)
 
 ### Community
 - [Yellow Discord](https://discord.gg/yellownetwork)
