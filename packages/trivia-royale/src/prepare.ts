@@ -2,171 +2,84 @@
  * Preparation Script for Trivia Royale
  *
  * This script helps you prepare for running the game by:
- * - Generating 6 test wallets
+ * - Generating mnemonic-based HD wallets
+ * - Showing Master wallet address for funding
  * - Checking balances
  * - Testing ClearNode connectivity
- * - Displaying funding instructions
  */
 
-import { createPublicClient, createWalletClient, http, formatEther } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { sepolia } from "viem/chains";
-import { connectToClearNode } from "./yellow-integration";
+import { mnemonicToAccount } from 'viem/accounts';
+import { formatEther, parseEther } from 'viem';
+import {
+  generateNewMnemonic,
+  loadWallets,
+  getMasterWallet,
+  createPublicRpcClient,
+  deriveAddress,
+} from './utils/wallets';
+import { SEPOLIA_CONFIG } from './utils/contracts';
 
-// ==================== CONFIG ====================
-const CONFIG = {
-  chainId: 11155111,
-  rpcUrl: "https://rpc.ankr.com/eth_sepolia",
-  clearNodeUrl: "wss://testnet-clearnode.nitrolite.org",
-};
-
-const PARTICIPANT_NAMES = ["Alice", "Bob", "Charlie", "Diana", "Eve", "AI Host"];
-
-// ==================== WALLET GENERATION ====================
-
-/**
- * Generate a random private key
- */
-function generatePrivateKey(): `0x${string}` {
-  const randomBytes = crypto.getRandomValues(new Uint8Array(32));
-  return `0x${Array.from(randomBytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")}`;
-}
-
-/**
- * Generate 6 deterministic wallets
- */
-function generateWallets() {
-  const wallets = [];
-
-  for (let i = 0; i < 6; i++) {
-    const privateKey = generatePrivateKey();
-    const account = privateKeyToAccount(privateKey);
-
-    wallets.push({
-      name: PARTICIPANT_NAMES[i],
-      address: account.address,
-      privateKey,
-    });
-  }
-
-  return wallets;
-}
-
-// ==================== BALANCE CHECKING ====================
-
-/**
- * Check ETH balance for an address
- */
-async function checkBalance(address: string) {
-  const publicClient = createPublicClient({
-    chain: sepolia,
-    transport: http(CONFIG.rpcUrl),
-  });
-
-  const balance = await publicClient.getBalance({
-    address: address as `0x${string}`,
-  });
-
-  return balance;
-}
-
-// ==================== MAIN SCRIPT ====================
+const WALLET_NAMES = ['Master', 'Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Server'];
 
 async function main() {
-  console.log("\n🎮 TRIVIA ROYALE - Preparation Script\n");
-  console.log("=" .repeat(60));
+  console.log('\n🎮 TRIVIA ROYALE - Setup\n');
 
-  // Step 1: Generate Wallets
-  console.log("\n1️⃣  Generating Test Wallets...\n");
-  const wallets = generateWallets();
+  // Check for existing mnemonic
+  let mnemonic = process.env.MNEMONIC;
 
-  console.log("Generated 6 wallets:");
-  wallets.forEach((wallet, index) => {
-    console.log(`\n${index + 1}. ${wallet.name}`);
-    console.log(`   Address:     ${wallet.address}`);
-    console.log(`   Private Key: ${wallet.privateKey}`);
-  });
+  if (!mnemonic) {
+    console.log('⚠️  GENERATING NEW MNEMONIC - SAVE THIS!\n');
+    mnemonic = generateNewMnemonic();
+    console.log(`${mnemonic}\n`);
+    console.log('📝 Add to .env:');
+    console.log(`MNEMONIC="${mnemonic}"\n`);
 
-  // Step 2: Check Balances
-  console.log("\n\n2️⃣  Checking ETH Balances...\n");
-
-  let totalBalance = 0n;
-  const balances: { name: string; address: string; balance: bigint }[] = [];
-
-  for (const wallet of wallets) {
-    try {
-      const balance = await checkBalance(wallet.address);
-      balances.push({
-        name: wallet.name,
-        address: wallet.address,
-        balance,
-      });
-      totalBalance += balance;
-
-      const hasBalance = balance > 0n;
-      const icon = hasBalance ? "✅" : "❌";
-      console.log(
-        `${icon} ${wallet.name}: ${formatEther(balance)} ETH`
-      );
-    } catch (error) {
-      console.log(`❌ ${wallet.name}: Error checking balance`);
+    // Show derived addresses (without full wallet loading)
+    console.log('👥 Wallet Addresses (HD Path: m/44\'/60\'/N\'/0/0):\n');
+    for (let i = 0; i < WALLET_NAMES.length; i++) {
+      const address = deriveAddress(mnemonic, i);
+      console.log(`   ${i}. ${WALLET_NAMES[i]?.padEnd(8)}: ${address}`);
     }
+
+    console.log('\n📋 Next Steps:');
+    console.log('   1. Save MNEMONIC to .env file');
+    console.log('   2. Fund Master wallet (index 0) with 0.5 ETH from faucet:');
+    console.log('      https://faucets.chain.link/sepolia');
+    console.log('   3. Run: bun run fund');
+    console.log('   4. Run: bun run play\n');
+
+    return;
   }
 
-  console.log(`\n   Total: ${formatEther(totalBalance)} ETH`);
+  // Existing mnemonic - show status
+  console.log('✅ Using existing MNEMONIC from .env\n');
 
-  // Step 3: Test ClearNode Connection
-  console.log("\n\n3️⃣  Testing ClearNode Connectivity...\n");
+  const wallets = loadWallets();
+  const master = getMasterWallet(wallets);
+  const publicClient = createPublicRpcClient();
 
-  try {
-    const ws = await connectToClearNode(CONFIG.clearNodeUrl);
-    console.log("  ✅ ClearNode is reachable");
-    ws.close();
-  } catch (error) {
-    console.log("  ❌ Could not connect to ClearNode");
-    console.log(`  Error: ${error}`);
-  }
+  // Check master balance
+  const masterBalance = await publicClient.getBalance({ address: master.address });
 
-  // Step 4: Display Instructions
-  console.log("\n\n4️⃣  Next Steps\n");
-  console.log("=" .repeat(60));
+  console.log('💰 Master Wallet:\n');
+  console.log(`   Address: ${master.address}`);
+  console.log(`   Balance: ${formatEther(masterBalance)} ETH\n`);
 
-  const needsFunding = balances.every((b) => b.balance === 0n);
+  const requiredAmount = parseEther(SEPOLIA_CONFIG.funding.masterAmount);
 
-  if (needsFunding) {
-    console.log("\n⚠️  WALLETS NEED FUNDING\n");
-    console.log("Get Sepolia ETH from the faucet:");
-    console.log("  🔗 https://faucets.chain.link/sepolia\n");
-    console.log("Fund these addresses:\n");
-
-    wallets.forEach((wallet, index) => {
-      console.log(`${index + 1}. ${wallet.name}: ${wallet.address}`);
-    });
-
-    console.log("\n💡 Tip: You need at least 0.1 ETH per wallet for gas fees");
-    console.log("        Recommended: 0.2 ETH per wallet\n");
+  if (masterBalance < requiredAmount) {
+    console.log('⚠️  MASTER WALLET NEEDS FUNDING!\n');
+    console.log(`   Required: ${SEPOLIA_CONFIG.funding.masterAmount} ETH`);
+    console.log(`   Current:  ${formatEther(masterBalance)} ETH\n`);
+    console.log('📋 Get ETH from faucet:');
+    console.log('   https://faucets.chain.link/sepolia\n');
+    console.log(`   Send to: ${master.address}\n`);
   } else {
-    console.log("\n✅ Wallets are funded!\n");
-    console.log("You can now:");
-    console.log("  1. Save these private keys to .env (optional)");
-    console.log("  2. Run the game simulation: bun run src/game.ts");
-    console.log("  3. (Future) Run with Yellow SDK integration\n");
+    console.log('✅ Master wallet has sufficient funds\n');
+    console.log('📋 Next Steps:');
+    console.log('   1. Run: bun run fund');
+    console.log('   2. Run: bun run play\n');
   }
-
-  // Step 5: Save to .env (optional)
-  console.log("\n5️⃣  Environment Variables\n");
-  console.log("=" .repeat(60));
-  console.log("\nTo use these wallets, add to your .env file:\n");
-
-  wallets.forEach((wallet, index) => {
-    const envVar = index === 5 ? "AI_HOST_PRIVATE_KEY" : `PLAYER${index + 1}_PRIVATE_KEY`;
-    console.log(`${envVar}=${wallet.privateKey}`);
-  });
-
-  console.log("\n\n✅ Preparation Complete!\n");
 }
 
-// Run the script
 main().catch(console.error);

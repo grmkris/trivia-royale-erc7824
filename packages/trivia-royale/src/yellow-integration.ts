@@ -20,6 +20,7 @@ import {
   createCloseAppSessionMessage,
   type CreateAppSessionRequestParams,
   type StateSigner,
+  WalletStateSigner,
 } from "@erc7824/nitrolite";
 import {
   createPublicClient,
@@ -74,55 +75,7 @@ export interface AppSessionInfo {
 // ==================== CLIENT CREATION ====================
 
 type RequiredWalletClient = WalletClient<Transport, Chain, ParseAccount<Account>>
-/**
- * Create a NitroliteClient for a participant
- */
-export async function createNitroliteClient(
-  walletClient: RequiredWalletClient,
-  config: YellowConfig
-): Promise<NitroliteClient> {
-  const publicClient = createPublicClient({
-    chain: sepolia,
-    transport: http(config.rpcUrl),
-  });
 
-  // TODO: Need to implement StateSigner
-  // For now, this is a placeholder
-  const stateSigner: StateSigner = {
-    getAddress: () => {
-      const account = walletClient.account;
-      return account.address;
-    },
-    signRawMessage: async (message) => {
-      const account = walletClient.account;
-      return await walletClient.signMessage({
-        account,
-        message: typeof message === "string" ? message : JSON.stringify(message),
-      });
-    },
-    signState: async (channelId, state) => {
-      // This will need proper implementation
-      const account = walletClient.account;
-      if (!account) throw new Error("No account found");
-
-      // Sign the state hash
-      // This is simplified - actual implementation needs proper state hash calculation
-      return await walletClient.signMessage({
-        account,
-        message: typeof state === "string" ? state : JSON.stringify(state),
-      });
-    },
-  };
-
-  return new NitroliteClient({
-    publicClient,
-    walletClient,
-    stateSigner,
-    addresses: config.contractAddresses,
-    chainId: config.chainId,
-    challengeDuration: 86400n, // 24 hours
-  });
-}
 
 // ==================== CLEARNODE CONNECTION ====================
 

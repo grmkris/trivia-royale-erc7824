@@ -1,0 +1,12 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "erc-7824",
+    "guides",
+    "quick-start",
+    "nitrolite-client",
+    "nitrolite-rpc",
+    "legacy"
+  ]
+}

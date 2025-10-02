@@ -1,0 +1,11 @@
+{
+  "title": "Quick Start",
+  "pages": [
+    "index",
+    "initializing-channel",
+    "connect-to-the-clearnode",
+    "balances",
+    "application-session",
+    "close-session"
+  ]
+}

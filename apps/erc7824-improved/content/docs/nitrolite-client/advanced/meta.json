@@ -1,0 +1,10 @@
+{
+  "title": "Advanced",
+  "pages": [
+    "index",
+    "abstract-accounts",
+    "erc20-service",
+    "nitrolite-service",
+    "supported-sig-formats"
+  ]
+}
