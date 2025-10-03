@@ -2,6 +2,7 @@ import { mnemonicToAccount, generateMnemonic, english } from 'viem/accounts';
 import type { Account, WalletClient, Chain, Transport, ParseAccount } from 'viem';
 import { createWalletClient, createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
+import { env } from '../env';
 
 const WALLET_NAMES = [
   'Master',    // index 0 - Funding source
@@ -22,15 +23,27 @@ export interface Wallet {
 }
 
 /**
+ * Wallets object with named properties for type safety and autocomplete
+ */
+export interface Wallets {
+  master: Wallet;
+  alice: Wallet;
+  bob: Wallet;
+  charlie: Wallet;
+  diana: Wallet;
+  eve: Wallet;
+  server: Wallet;
+  all: Wallet[];
+  players: Wallet[];
+}
+
+/**
  * Load all wallets from MNEMONIC in .env
  */
-export function loadWallets(): Wallet[] {
-  const mnemonic = process.env.MNEMONIC;
-  if (!mnemonic) {
-    throw new Error('MNEMONIC not found in .env - run `bun run prepare` first');
-  }
+export function loadWallets(): Wallets {
+  const mnemonic = env.MNEMONIC;
 
-  return WALLET_NAMES.map((name, index) => {
+  const walletArray = WALLET_NAMES.map((name, index) => {
     const account = mnemonicToAccount(mnemonic, { accountIndex: index });
     const client = createWalletClient({
       account,
@@ -46,40 +59,19 @@ export function loadWallets(): Wallet[] {
       address: account.address,
     };
   });
-}
 
-/**
- * Get specific wallet by name
- */
-export function getWallet(wallets: Wallet[], name: string): Wallet {
-  const wallet = wallets.find(w => w.name === name);
-  if (!wallet) {
-    throw new Error(`Wallet ${name} not found`);
-  }
-  return wallet;
-}
-
-/**
- * Get master wallet (funding source)
- */
-export function getMasterWallet(wallets: Wallet[]): Wallet {
-  return getWallet(wallets, 'Master');
-}
-
-/**
- * Get player wallets (Alice, Bob, Charlie, Diana, Eve)
- */
-export function getPlayerWallets(wallets: Wallet[]): Wallet[] {
-  return wallets.filter(w =>
-    ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'].includes(w.name)
-  );
-}
-
-/**
- * Get server wallet
- */
-export function getServerWallet(wallets: Wallet[]): Wallet {
-  return getWallet(wallets, 'Server');
+  // Create object with named properties
+  return {
+    master: walletArray[0]!,
+    alice: walletArray[1]!,
+    bob: walletArray[2]!,
+    charlie: walletArray[3]!,
+    diana: walletArray[4]!,
+    eve: walletArray[5]!,
+    server: walletArray[6]!,
+    all: walletArray,
+    players: [walletArray[1]!, walletArray[2]!, walletArray[3]!, walletArray[4]!, walletArray[5]!],
+  };
 }
 
 /**

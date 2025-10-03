@@ -1,11 +1,11 @@
 export const SEPOLIA_CONFIG = {
   chainId: 11155111,
   rpcUrl: 'https://rpc.ankr.com/eth_sepolia',
-  clearNodeUrl: 'wss://testnet-clearnode.nitrolite.org',
+  clearNodeUrl: 'wss://clearnet.yellow.com/ws', // Yellow Network ClearNet
 
   contracts: {
-    custody: '0x2C0b7CbD3B3638b64DC4B349b38a25F234E0FF3c' as const,
-    adjudicator: '0x6D3B5EFa1f81f65037cD842F48E44BcBCa48CBEF' as const,
+    custody: '0x019B65A265EB3363822f2752141b3dF16131b262' as const, // Latest: 2025-08-27
+    adjudicator: '0x7c7ccbc98469190849BCC6c926307794fDfB11F2' as const, // Latest: 2025-08-27
     tokenAddress: '0x0000000000000000000000000000000000000000' as const, // Native ETH
   },
 
@@ -15,8 +15,8 @@ export const SEPOLIA_CONFIG = {
   },
 
   game: {
-    entryFee: '0.02',         // 0.02 ETH per player
-    prizePool: '0.1',         // 5 × 0.02 ETH
+    entryFee: '0.0001',       // 0.0001 ETH per player (testing amount)
+    prizePool: '0.0005',      // 5 × 0.0001 ETH
     maxPlayers: 5,
     rounds: 3,
     commitTimeoutMs: 5000,

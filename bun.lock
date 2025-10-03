@@ -78,6 +78,7 @@
       "dependencies": {
         "@erc7824/nitrolite": "^0.3.0",
         "viem": "^2.37.11",
+        "zod": "^4.1.11",
       },
       "devDependencies": {
         "@types/bun": "latest",

@@ -11,9 +11,6 @@ import { remarkMdxMermaid } from 'fumadocs-core/mdx-plugins';
 export const docs = defineDocs({
   docs: {
     schema: frontmatterSchema,
-    postprocess: {
-      includeProcessedMarkdown: true,
-    },
   },
   meta: {
     schema: metaSchema,

@@ -14,13 +14,20 @@
 import {
   NitroliteClient,
   createAuthRequestMessage,
-  createAuthVerifyMessage,
+  parseAnyRPCResponse,
+  createAuthVerifyMessageFromChallenge,
+  createEIP712AuthMessageSigner,
   createAppSessionMessage,
   createApplicationMessage,
   createCloseAppSessionMessage,
   type CreateAppSessionRequestParams,
   type StateSigner,
   WalletStateSigner,
+  RPCMethod,
+  type AuthChallengeResponse,
+  type AuthVerifyResponse,
+  type PartialEIP712AuthMessage,
+  type EIP712AuthDomain,
 } from "@erc7824/nitrolite";
 import {
   createPublicClient,
@@ -76,6 +83,15 @@ export interface AppSessionInfo {
 
 type RequiredWalletClient = WalletClient<Transport, Chain, ParseAccount<Account>>
 
+// ==================== CONSTANTS ====================
+
+/**
+ * EIP-712 domain for ClearNode authentication
+ * Note: Must match app_name in auth request
+ */
+const AUTH_DOMAIN: EIP712AuthDomain = {
+  name: "Trivia Royale",
+};
 
 // ==================== CLEARNODE CONNECTION ====================
 
@@ -109,7 +125,7 @@ export async function connectToClearNode(
 }
 
 /**
- * Authenticate with ClearNode
+ * Authenticate with ClearNode using EIP-712 typed signatures
  */
 export async function authenticateClearNode(
   ws: WebSocket,
@@ -123,60 +139,98 @@ export async function authenticateClearNode(
     }
 
     try {
-      // Step 1: Send auth request
+      const walletAddress = account.address;
+      const expire = (Math.floor(Date.now() / 1000) + 3600).toString();
+
+      // Step 1: Send auth request with address and session_key
       const authRequest = await createAuthRequestMessage({
-        address: account.address,
-        session_key: account.address,
+        address: walletAddress,
+        session_key: walletAddress, // Using wallet as session key
         app_name: "Trivia Royale",
-        expire: (Math.floor(Date.now() / 1000) + 3600).toString(),
+        expire,
         scope: "game",
-        application: account.address,
+        application: walletAddress,
         allowances: [],
       });
 
       ws.send(authRequest);
-      console.log(`  📤 Sent auth request for ${account.address}`);
+      console.log(`  📤 Sent auth request for ${walletAddress}`);
 
-      // Step 2: Wait for challenge
+      // Step 2: Wait for challenge and authenticate
       const handleMessage = async (event: MessageEvent) => {
         try {
-          const response = JSON.parse(event.data);
+          // Parse response using SDK parser for type safety
+          const response = parseAnyRPCResponse(event.data);
+          console.log(`  📨 Received ${response.method}:`, response.params);
 
-          // Check if it's an auth challenge
-          if (response.method === "auth_challenge") {
-            const challenge = response.params;
-            console.log(`  📥 Received auth challenge`);
+          // Handle auth challenge
+          if (response.method === RPCMethod.AuthChallenge) {
+            const challengeMessage = response.params.challengeMessage;
 
-            // Step 3: Sign challenge and send verification
-            const authVerify = await createAuthVerifyMessage(
-              async (message) => {
-                // MessageSigner implementation
-                return await wallet.signMessage({
-                  account,
-                  message: typeof message === "string" ? message : JSON.stringify(message),
-                });
-              },
-              challenge
+            console.log(`  📥 Received auth challenge: ${challengeMessage}`);
+
+            // Create partial EIP-712 message (SDK will add challenge and wallet)
+            // Note: expire should be number for EIP-712 uint256, but SDK types say string
+            const partialMessage: PartialEIP712AuthMessage = {
+              scope: "game",
+              application: walletAddress,
+              participant: walletAddress, // Using wallet as participant
+              expire: (Math.floor(Date.now() / 1000) + 3600).toString(), // number for EIP-712 uint256
+              allowances: [],
+            };
+
+            console.log(`  🔐 Creating EIP-712 signer...`);
+
+            // Create EIP-712 message signer (SDK handles signing)
+            const signer = createEIP712AuthMessageSigner(
+              wallet,
+              partialMessage,
+              AUTH_DOMAIN
             );
 
+            console.log(`  ✍️  Signing auth verification...`);
+
+            // Send auth verification using SDK's helper
+            const authVerify = await createAuthVerifyMessageFromChallenge(
+              signer,
+              challengeMessage // Just the UUID string
+            );
+
+            console.log(`  📤 Sending auth verify message:`, authVerify);
             ws.send(authVerify);
             console.log(`  📤 Sent auth verification`);
           }
 
-          // Check if auth succeeded
-          if (response.method === "auth_success") {
-            ws.removeEventListener("message", handleMessage);
-            console.log(`  ✅ Authentication successful`);
-            resolve();
+          // Handle auth success
+          if (response.method === RPCMethod.AuthVerify) {
+            const verifyResponse = response as AuthVerifyResponse;
+
+            if (verifyResponse.params.success) {
+              ws.removeEventListener("message", handleMessage);
+              console.log(`  ✅ Authentication successful`);
+
+              // Store JWT if provided
+              if (verifyResponse.params.jwtToken) {
+                console.log(`  🎟️  Received JWT token`);
+                // TODO: Store JWT for future sessions
+              }
+
+              resolve();
+            } else {
+              ws.removeEventListener("message", handleMessage);
+              reject(new Error("Authentication failed"));
+            }
           }
 
-          // Check if auth failed
-          if (response.method === "auth_failure") {
+          // Handle errors
+          if (response.method === RPCMethod.Error) {
+            console.error("  ❌ ClearNode error:", response);
             ws.removeEventListener("message", handleMessage);
-            reject(new Error("Authentication failed"));
+            reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
           }
         } catch (error) {
           console.error("  ❌ Error handling auth message:", error);
+          // Don't reject here, might be a different message format
         }
       };
 

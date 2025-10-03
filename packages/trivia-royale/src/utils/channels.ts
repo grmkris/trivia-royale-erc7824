@@ -1,4 +1,4 @@
-import { NitroliteClient, WalletStateSigner } from '@erc7824/nitrolite';
+import { NitroliteClient, WalletStateSigner, getChannelId } from '@erc7824/nitrolite';
 import { parseEther } from 'viem';
 import { SEPOLIA_CONFIG } from './contracts';
 import { createPublicRpcClient, type Wallet } from './wallets';
@@ -46,43 +46,71 @@ export async function findChannel(
  */
 export async function createChannel(
   playerWallet: Wallet,
-  serverAddress: `0x${string}`,
+  serverWallet: Wallet,
   amount: string
 ): Promise<string> {
-  const client = createNitroliteClient(playerWallet, serverAddress);
+  const playerClient = createNitroliteClient(playerWallet, serverWallet.address);
+  const serverClient = createNitroliteClient(serverWallet, playerWallet.address);
   const amountWei = parseEther(amount);
 
   console.log(`  💰 ${playerWallet.name}: Depositing ${amount} ETH...`);
 
-  const { channelId } = await client.depositAndCreateChannel(SEPOLIA_CONFIG.contracts.tokenAddress, amountWei, {
-    channel: {
-      participants: [playerWallet.address, serverAddress],
-      adjudicator: SEPOLIA_CONFIG.contracts.adjudicator,
-      challenge: 3600n,
-      nonce: BigInt(Date.now()),
-    },
-    unsignedInitialState: {
-      intent: 1, // INITIALIZE
-      version: 0n,
-      data: '0x',
-      allocations: [
-        {
-          destination: playerWallet.address,
-          token: SEPOLIA_CONFIG.contracts.tokenAddress,
-          amount: amountWei,
-        },
-        {
-          destination: serverAddress,
-          token: SEPOLIA_CONFIG.contracts.tokenAddress,
-          amount: 0n,
-        },
-      ],
-    },
-    serverSignature: '0x',
-  });
+  // Build channel parameters
+  const channelParams = {
+    participants: [playerWallet.address, serverWallet.address],
+    adjudicator: SEPOLIA_CONFIG.contracts.adjudicator,
+    challenge: 3600n,
+    nonce: BigInt(Date.now()),
+  };
 
-  console.log(`  ✅ ${playerWallet.name}: Channel created (${channelId.slice(0, 10)}...)`);
-  return channelId;
+  // Build unsigned initial state
+  const unsignedInitialState = {
+    intent: 1, // INITIALIZE
+    version: 0n,
+    data: '0x' as const,
+    allocations: [
+      {
+        destination: playerWallet.address,
+        token: SEPOLIA_CONFIG.contracts.tokenAddress,
+        amount: amountWei,
+      },
+      {
+        destination: serverWallet.address,
+        token: SEPOLIA_CONFIG.contracts.tokenAddress,
+        amount: 0n,
+      },
+    ],
+  };
+
+  // Compute channel ID
+  const channelId = getChannelId(channelParams, SEPOLIA_CONFIG.chainId);
+
+  // Server signs the initial state
+  // Convert unsigned state to State with empty sigs for signing
+  const stateToSign = {
+    ...unsignedInitialState,
+    sigs: [] as `0x${string}`[],
+  };
+
+  const serverSigner = new WalletStateSigner(serverWallet.client);
+  const serverSignature = await serverSigner.signState(
+    channelId,
+    stateToSign
+  );
+
+  // Player creates channel with server's signature
+  const result = await playerClient.depositAndCreateChannel(
+    SEPOLIA_CONFIG.contracts.tokenAddress,
+    amountWei,
+    {
+      channel: channelParams,
+      unsignedInitialState,
+      serverSignature,
+    }
+  );
+
+  console.log(`  ✅ ${playerWallet.name}: Channel created (${result.channelId.slice(0, 10)}...)`);
+  return result.channelId;
 }
 
 /**
@@ -102,5 +130,5 @@ export async function ensureChannel(
   }
 
   // Create new
-  return createChannel(playerWallet, serverWallet.address, amount);
+  return createChannel(playerWallet, serverWallet, amount);
 }

@@ -13,7 +13,6 @@ import { formatEther, parseEther } from 'viem';
 import {
   generateNewMnemonic,
   loadWallets,
-  getMasterWallet,
   createPublicRpcClient,
   deriveAddress,
 } from './utils/wallets';
@@ -55,7 +54,7 @@ async function main() {
   console.log('✅ Using existing MNEMONIC from .env\n');
 
   const wallets = loadWallets();
-  const master = getMasterWallet(wallets);
+  const master = wallets.master;
   const publicClient = createPublicRpcClient();
 
   // Check master balance

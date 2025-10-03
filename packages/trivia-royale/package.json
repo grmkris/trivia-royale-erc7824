@@ -8,6 +8,7 @@
     "prepare": "bun run src/prepare.ts",
     "fund": "bun run src/fund.ts",
     "status": "bun run src/status.ts",
+    "test-clearnode": "bun run src/test-clearnode.ts",
     "play": "bun run src/play.ts",
     "check-types": "tsc --noEmit"
   },
@@ -19,6 +20,7 @@
   },
   "dependencies": {
     "@erc7824/nitrolite": "^0.3.0",
-    "viem": "^2.37.11"
+    "viem": "^2.37.11",
+    "zod": "^4.1.11"
   }
 }

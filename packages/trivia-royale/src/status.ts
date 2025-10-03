@@ -21,7 +21,7 @@ async function main() {
   console.log('│ Wallet   │ Address                                    │ ETH      │');
   console.log('├──────────┼────────────────────────────────────────────┼──────────┤');
 
-  for (const wallet of wallets) {
+  for (const wallet of wallets.all) {
     const balance = await publicClient.getBalance({ address: wallet.address });
     const ethBalance = formatEther(balance).padStart(8);
 

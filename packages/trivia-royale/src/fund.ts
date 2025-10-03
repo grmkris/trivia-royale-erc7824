@@ -7,9 +7,6 @@
 import { parseEther, formatEther } from 'viem';
 import {
   loadWallets,
-  getMasterWallet,
-  getPlayerWallets,
-  getServerWallet,
   createPublicRpcClient,
   type Wallet,
 } from './utils/wallets';
@@ -58,9 +55,9 @@ async function main() {
   console.log('\n🎮 TRIVIA ROYALE - Fund Distribution\n');
 
   const wallets = loadWallets();
-  const master = getMasterWallet(wallets);
-  const players = getPlayerWallets(wallets);
-  const server = getServerWallet(wallets);
+  const master = wallets.master;
+  const players = wallets.players;
+  const server = wallets.server;
   const publicClient = createPublicRpcClient();
 
   // Check master balance

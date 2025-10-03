@@ -11,7 +11,7 @@
  * Layer 1: STATE CHANNELS (On-Chain Escrow)
  * ------------------------------------------
  * - Creates 2-party payment channels between each player and server
- * - Locks funds on-chain in custody contract (0.05 ETH per player)
+ * - Locks funds on-chain in custody contract (0.0001 ETH per player)
  * - Enables off-chain state updates without gas fees
  * - Secure: Funds escrowed on-chain, can't be stolen
  * - Used in: Line 364 via `setupChannels()`
@@ -75,8 +75,6 @@
 import { parseEther, formatEther, keccak256, encodePacked, type Hex } from 'viem';
 import {
   loadWallets,
-  getPlayerWallets,
-  getServerWallet,
   type Wallet,
 } from './utils/wallets';
 import { SEPOLIA_CONFIG } from './utils/contracts';
@@ -191,7 +189,7 @@ async function setupChannels(
   const channelIds: string[] = [];
 
   for (const player of players) {
-    const channelId = await ensureChannel(player, server, '0.05');
+    const channelId = await ensureChannel(player, server, '0.0001');
     channelIds.push(channelId);
   }
 
@@ -416,10 +414,10 @@ async function main() {
 
   console.log('1. Loading wallets...\n');
   const wallets = loadWallets();
-  const players = getPlayerWallets(wallets);
-  const server = getServerWallet(wallets);
+  const players = wallets.players;
+  const server = wallets.server;
 
-  console.log(`   ✅ Loaded ${wallets.length} wallets`);
+  console.log(`   ✅ Loaded ${wallets.all.length} wallets`);
   players.forEach(p => console.log(`      - ${p.name}: ${p.address}`));
   console.log(`      - ${server.name}: ${server.address}\n`);
 
