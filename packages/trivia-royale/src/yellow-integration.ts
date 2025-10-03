@@ -15,7 +15,7 @@ import {
   NitroliteClient,
   createAuthRequestMessage,
   parseAnyRPCResponse,
-  createAuthVerifyMessageFromChallenge,
+  createAuthVerifyMessage,
   createEIP712AuthMessageSigner,
   createAppSessionMessage,
   createApplicationMessage,
@@ -41,8 +41,10 @@ import {
   type Account,
   type Chain,
   type ParseAccount,
+  getAddress,
 } from "viem";
 import { sepolia } from "viem/chains";
+import { loadOrGenerateSessionKeypair } from "./utils/keyManager";
 
 // ==================== TYPES ====================
 
@@ -90,7 +92,7 @@ type RequiredWalletClient = WalletClient<Transport, Chain, ParseAccount<Account>
  * Note: Must match app_name in auth request
  */
 const AUTH_DOMAIN: EIP712AuthDomain = {
-  name: "Trivia Royale",
+  name: "Test Domain",
 };
 
 // ==================== CLEARNODE CONNECTION ====================
@@ -140,19 +142,25 @@ export async function authenticateClearNode(
 
     try {
       const walletAddress = account.address;
-      const expire = (Math.floor(Date.now() / 1000) + 3600).toString();
+      const expireNum = Math.floor(Date.now() / 1000) + 3600;
+      const expire = expireNum.toString(); // STRING for auth request (server expects string)
+      // Load or generate session keypair (separate from main wallet)
+      const sessionKeypair = loadOrGenerateSessionKeypair();
+      console.log(`  🔑 Main wallet: ${walletAddress}`);
+      console.log(`  🔐 Session key: ${sessionKeypair.address}`);
 
-      // Step 1: Send auth request with address and session_key
+      // Step 1: Send auth request with main wallet and session key
       const authRequest = await createAuthRequestMessage({
-        address: walletAddress,
-        session_key: walletAddress, // Using wallet as session key
-        app_name: "Trivia Royale",
-        expire,
-        scope: "game",
-        application: walletAddress,
+        address: walletAddress,             // Main wallet address
+        session_key: sessionKeypair.address, // Session wallet address (different!)
+        app_name: "Test Domain",
+        expire, // Pass as string
+        scope: "console",
+        application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
         allowances: [],
       });
 
+      console.log(`  📤 Sending auth request:`, authRequest);
       ws.send(authRequest);
       console.log(`  📤 Sent auth request for ${walletAddress}`);
 
@@ -165,19 +173,18 @@ export async function authenticateClearNode(
 
           // Handle auth challenge
           if (response.method === RPCMethod.AuthChallenge) {
-            const challengeMessage = response.params.challengeMessage;
 
-            console.log(`  📥 Received auth challenge: ${challengeMessage}`);
+            console.log(`  📥 Received auth challenge: ${response.params.challengeMessage}`);
 
             // Create partial EIP-712 message (SDK will add challenge and wallet)
-            // Note: expire should be number for EIP-712 uint256, but SDK types say string
-            const partialMessage: PartialEIP712AuthMessage = {
-              scope: "game",
-              application: walletAddress,
-              participant: walletAddress, // Using wallet as participant
-              expire: (Math.floor(Date.now() / 1000) + 3600).toString(), // number for EIP-712 uint256
+            // Note: expire as STRING matches official SDK tests
+            const partialMessage = {
+              scope: "console",
+              application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
+              participant: sessionKeypair.address, // Session wallet address (not main!)
+              expire, // STRING (matches official SDK integration tests)
               allowances: [],
-            };
+            } satisfies PartialEIP712AuthMessage;
 
             console.log(`  🔐 Creating EIP-712 signer...`);
 
@@ -190,10 +197,10 @@ export async function authenticateClearNode(
 
             console.log(`  ✍️  Signing auth verification...`);
 
-            // Send auth verification using SDK's helper
-            const authVerify = await createAuthVerifyMessageFromChallenge(
+            // Send auth verification with full challenge response object
+            const authVerify = await createAuthVerifyMessage(
               signer,
-              challengeMessage // Just the UUID string
+              response, // Full challenge response object
             );
 
             console.log(`  📤 Sending auth verify message:`, authVerify);
@@ -203,7 +210,7 @@ export async function authenticateClearNode(
 
           // Handle auth success
           if (response.method === RPCMethod.AuthVerify) {
-            const verifyResponse = response as AuthVerifyResponse;
+            const verifyResponse = response;
 
             if (verifyResponse.params.success) {
               ws.removeEventListener("message", handleMessage);

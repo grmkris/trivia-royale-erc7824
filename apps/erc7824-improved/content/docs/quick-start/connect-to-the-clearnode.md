@@ -269,9 +269,9 @@ sequenceDiagram
 
 ```javascript
 import {
-  createAuthRequestMessage, 
-  createAuthVerifyMessage, 
-  createEIP712AuthMessageSigner, 
+  createAuthRequestMessage,
+  createAuthVerifyMessage,
+  createEIP712AuthMessageSigner,
   parseRPCResponse,
   RPCMethod,
 } from '@erc7824/nitrolite';
@@ -279,10 +279,10 @@ import { ethers } from 'ethers';
 
 // Create and send auth_request
 const authRequestMsg = await createAuthRequestMessage({
-  wallet: '0xYourWalletAddress',
-  participant: '0xYourSignerAddress',
+  address: '0xYourWalletAddress',
+  session_key: '0xYourSignerAddress',
   app_name: 'Your Domain',
-  expire: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiration
+  expire: '3600', // 1 hour expiration (as string)
   scope: 'console',
   application: '0xYourApplicationAddress',
   allowances: [],
@@ -308,15 +308,15 @@ ws.onmessage = async (event) => {
         // Create EIP-712 message signer function
         const eip712MessageSigner = createEIP712AuthMessageSigner(
           walletClient, // Your wallet client instance
-          {  
+          {
             // EIP-712 message structure, data should match auth_request
-            scope: authRequestMsg.scope,
-            application: authRequestMsg.application,
-            participant: authRequestMsg.participant,
-            expire: authRequestMsg.expire,
-            allowances: authRequestMsg.allowances,
+            scope: 'console',
+            application: '0xYourApplicationAddress',
+            participant: '0xYourSignerAddress', // Should match session_key from auth_request
+            expire: '3600',
+            allowances: [],
           },
-          { 
+          {
             // Domain for EIP-712 signing
             name: 'Your Domain',
           },

@@ -1,7 +1,7 @@
 export const SEPOLIA_CONFIG = {
   chainId: 11155111,
   rpcUrl: 'https://rpc.ankr.com/eth_sepolia',
-  clearNodeUrl: 'wss://clearnet.yellow.com/ws', // Yellow Network ClearNet
+  clearNodeUrl: 'ws://localhost:8000/ws', // Local ClearNode
 
   contracts: {
     custody: '0x019B65A265EB3363822f2752141b3dF16131b262' as const, // Latest: 2025-08-27
