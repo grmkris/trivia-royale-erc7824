@@ -17,6 +17,7 @@ import {
   deriveAddress,
 } from './utils/wallets';
 import { SEPOLIA_CONFIG } from './utils/contracts';
+import { env } from './env';
 
 const WALLET_NAMES = ['Master', 'Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Server'];
 
@@ -24,7 +25,7 @@ async function main() {
   console.log('\n🎮 TRIVIA ROYALE - Setup\n');
 
   // Check for existing mnemonic
-  let mnemonic = process.env.MNEMONIC;
+  let mnemonic = env.MNEMONIC;
 
   if (!mnemonic) {
     console.log('⚠️  GENERATING NEW MNEMONIC - SAVE THIS!\n');

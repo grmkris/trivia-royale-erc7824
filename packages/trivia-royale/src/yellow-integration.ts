@@ -3,16 +3,13 @@
  *
  * This module provides helper functions for integrating with Yellow Network's
  * Nitrolite SDK, including:
- * - Creating NitroliteClient instances
  * - Connecting to ClearNode (WebSocket)
  * - Authenticating with ClearNode
- * - Creating state channels
  * - Managing application sessions
  * - Sending game messages
  */
 
 import {
-  NitroliteClient,
   createAuthRequestMessage,
   parseAnyRPCResponse,
   createAuthVerifyMessage,
@@ -20,70 +17,29 @@ import {
   createAppSessionMessage,
   createApplicationMessage,
   createCloseAppSessionMessage,
-  type CreateAppSessionRequestParams,
-  type StateSigner,
-  WalletStateSigner,
   RPCMethod,
-  type AuthChallengeResponse,
-  type AuthVerifyResponse,
   type PartialEIP712AuthMessage,
   type EIP712AuthDomain,
 } from "@erc7824/nitrolite";
 import {
-  createPublicClient,
-  createWalletClient,
-  http,
   type Address,
   type WalletClient,
-  type PublicClient,
   type Hex,
-  type Transport,
-  type Account,
-  type Chain,
-  type ParseAccount,
-  getAddress,
 } from "viem";
-import { sepolia } from "viem/chains";
-import { loadOrGenerateSessionKeypair } from "./utils/keyManager";
+import { generateSessionKeypair } from "./utils/keyManager";
 
 // ==================== TYPES ====================
 
-export interface YellowConfig {
-  chainId: number;
-  rpcUrl: string;
-  clearNodeUrl: string;
-  contractAddresses: {
-    custody: Address;
-    adjudicator: Address;
-    token: Address;
-    guestAddress: Address;
-  };
-}
-
-export interface ClearNodeConnection {
-  ws: WebSocket;
-  authenticated: boolean;
-  address: Address;
-}
-
-export interface ChannelInfo {
-  channelId: Hex;
-  participants: Address[];
-  allocations: Array<{
-    destination: Address;
-    token: Address;
-    amount: bigint;
-  }>;
-}
+/**
+ * Message signer function type
+ * Used for signing ClearNode messages (application sessions, game messages)
+ */
+export type MessageSigner = (message: any) => Promise<Hex>;
 
 export interface AppSessionInfo {
   sessionId: Hex;
   status: "pending" | "open" | "closed";
 }
-
-// ==================== CLIENT CREATION ====================
-
-type RequiredWalletClient = WalletClient<Transport, Chain, ParseAccount<Account>>
 
 // ==================== CONSTANTS ====================
 
@@ -144,8 +100,8 @@ export async function authenticateClearNode(
       const walletAddress = account.address;
       const expireNum = Math.floor(Date.now() / 1000) + 3600;
       const expire = expireNum.toString(); // STRING for auth request (server expects string)
-      // Load or generate session keypair (separate from main wallet)
-      const sessionKeypair = loadOrGenerateSessionKeypair();
+      // Generate ephemeral session keypair (separate from main wallet)
+      const sessionKeypair = generateSessionKeypair();
       console.log(`  🔑 Main wallet: ${walletAddress}`);
       console.log(`  🔐 Session key: ${sessionKeypair.address}`);
 
@@ -171,69 +127,65 @@ export async function authenticateClearNode(
           const response = parseAnyRPCResponse(event.data);
           console.log(`  📨 Received ${response.method}:`, response.params);
 
-          // Handle auth challenge
-          if (response.method === RPCMethod.AuthChallenge) {
+          switch (response.method) {
+            case RPCMethod.AuthChallenge:
+              console.log(`  📥 Received auth challenge: ${response.params.challengeMessage}`);
 
-            console.log(`  📥 Received auth challenge: ${response.params.challengeMessage}`);
+              // Create partial EIP-712 message (SDK will add challenge and wallet)
+              // Note: expire as STRING matches official SDK tests
+              const partialMessage = {
+                scope: "console",
+                application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
+                participant: sessionKeypair.address, // Session wallet address (not main!)
+                expire, // STRING (matches official SDK integration tests)
+                allowances: [],
+              } satisfies PartialEIP712AuthMessage;
 
-            // Create partial EIP-712 message (SDK will add challenge and wallet)
-            // Note: expire as STRING matches official SDK tests
-            const partialMessage = {
-              scope: "console",
-              application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
-              participant: sessionKeypair.address, // Session wallet address (not main!)
-              expire, // STRING (matches official SDK integration tests)
-              allowances: [],
-            } satisfies PartialEIP712AuthMessage;
+              console.log(`  🔐 Creating EIP-712 signer...`);
 
-            console.log(`  🔐 Creating EIP-712 signer...`);
+              // Create EIP-712 message signer (SDK handles signing)
+              const signer = createEIP712AuthMessageSigner(
+                wallet,
+                partialMessage,
+                AUTH_DOMAIN
+              );
 
-            // Create EIP-712 message signer (SDK handles signing)
-            const signer = createEIP712AuthMessageSigner(
-              wallet,
-              partialMessage,
-              AUTH_DOMAIN
-            );
+              console.log(`  ✍️  Signing auth verification...`);
 
-            console.log(`  ✍️  Signing auth verification...`);
+              // Send auth verification with full challenge response object
+              const authVerify = await createAuthVerifyMessage(
+                signer,
+                response, // Full challenge response object
+              );
 
-            // Send auth verification with full challenge response object
-            const authVerify = await createAuthVerifyMessage(
-              signer,
-              response, // Full challenge response object
-            );
+              console.log(`  📤 Sending auth verify message:`, authVerify);
+              ws.send(authVerify);
+              console.log(`  📤 Sent auth verification`);
+              break;
 
-            console.log(`  📤 Sending auth verify message:`, authVerify);
-            ws.send(authVerify);
-            console.log(`  📤 Sent auth verification`);
-          }
+            case RPCMethod.AuthVerify:
+              if (response.params.success) {
+                ws.removeEventListener("message", handleMessage);
+                console.log(`  ✅ Authentication successful`);
 
-          // Handle auth success
-          if (response.method === RPCMethod.AuthVerify) {
-            const verifyResponse = response;
+                // Store JWT if provided
+                if (response.params.jwtToken) {
+                  console.log(`  🎟️  Received JWT token`);
+                  // TODO: Store JWT for future sessions
+                }
 
-            if (verifyResponse.params.success) {
-              ws.removeEventListener("message", handleMessage);
-              console.log(`  ✅ Authentication successful`);
-
-              // Store JWT if provided
-              if (verifyResponse.params.jwtToken) {
-                console.log(`  🎟️  Received JWT token`);
-                // TODO: Store JWT for future sessions
+                resolve();
+              } else {
+                ws.removeEventListener("message", handleMessage);
+                reject(new Error("Authentication failed"));
               }
+              break;
 
-              resolve();
-            } else {
+            case RPCMethod.Error:
+              console.error("  ❌ ClearNode error:", response);
               ws.removeEventListener("message", handleMessage);
-              reject(new Error("Authentication failed"));
-            }
-          }
-
-          // Handle errors
-          if (response.method === RPCMethod.Error) {
-            console.error("  ❌ ClearNode error:", response);
-            ws.removeEventListener("message", handleMessage);
-            reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
+              reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
+              break;
           }
         } catch (error) {
           console.error("  ❌ Error handling auth message:", error);
@@ -254,94 +206,39 @@ export async function authenticateClearNode(
   });
 }
 
-// ==================== CHANNEL MANAGEMENT ====================
-
-/**
- * Create a state channel on-chain
- * Note: This requires all participants to have deposited funds
- */
-export async function createStateChannel(
-  client: NitroliteClient,
-  participants: Address[],
-  adjudicator: Address,
-  initialAllocations: Array<{
-    destination: Address;
-    token: Address;
-    amount: bigint;
-  }>
-): Promise<ChannelInfo> {
-  console.log("\n  📝 Creating state channel...");
-  console.log(`  Participants: ${participants.length}`);
-
-  // TODO: Get server signature from ClearNode
-  // This is a placeholder
-  const serverSignature = "0x" as Hex;
-
-  const { channelId, initialState, txHash } = await client.createChannel({
-    channel: {
-      participants,
-      adjudicator,
-      challenge: 86400n,
-      nonce: BigInt(Date.now()),
-    },
-    unsignedInitialState: {
-      intent: 1, // INITIALIZE
-      version: 0n,
-      data: "0x",
-      allocations: initialAllocations,
-    },
-    serverSignature,
-  });
-
-  console.log(`  ✅ Channel created: ${channelId}`);
-  console.log(`  Transaction: ${txHash}`);
-
-  return {
-    channelId,
-    participants,
-    allocations: initialAllocations,
-  };
-}
-
-/**
- * Deposit funds to custody contract
- */
-export async function depositFunds(
-  client: NitroliteClient,
-  tokenAddress: Address,
-  amount: bigint
-): Promise<Hex> {
-  console.log(`  💰 Depositing ${amount} tokens...`);
-  const txHash = await client.deposit(tokenAddress, amount);
-  console.log(`  ✅ Deposit complete: ${txHash}`);
-  return txHash;
-}
-
 // ==================== APPLICATION SESSIONS ====================
 
 /**
  * Create an application session for the game
+ * Game Master pattern: server controls game, players have no voting power
  */
 export async function createGameSession(
   ws: WebSocket,
-  signer: any, // MessageSigner
+  signer: MessageSigner,
   participants: Address[],
   initialAllocations: Array<{
     participant: Address;
     asset: string;
     amount: string;
-  }>
+  }>,
+  serverAddress: Address,
+  protocol: string = 'NitroRPC/0.4'
 ): Promise<AppSessionInfo> {
   return new Promise(async (resolve, reject) => {
     console.log("\n  🎮 Creating game session...");
 
     try {
+      // Game Master pattern: players have weight 0, server has weight 100
+      const weights = participants.map(p =>
+        p.toLowerCase() === serverAddress.toLowerCase() ? 100 : 0
+      );
+
       const sessionMsg = await createAppSessionMessage(signer, {
         definition: {
-          protocol: "nitroliterpc",
+          protocol,
           participants,
-          weights: participants.map(() => 100), // Equal weights
-          quorum: 100, // All must agree
+          weights, // Server: 100, Players: 0
+          quorum: 100, // Only server needs to agree
           challenge: 0,
           nonce: Date.now(),
         },
@@ -355,18 +252,26 @@ export async function createGameSession(
       // Wait for response
       const handleMessage = (event: MessageEvent) => {
         try {
-          const response = JSON.parse(event.data);
+          const response = parseAnyRPCResponse(event.data);
 
-          if (response.method === "create_app_session") {
-            ws.removeEventListener("message", handleMessage);
+          switch (response.method) {
+            case RPCMethod.CreateAppSession:
+              ws.removeEventListener("message", handleMessage);
 
-            const sessionId = response.params.app_session_id;
-            console.log(`  ✅ Session created: ${sessionId}`);
+              const sessionId = response.params.appSessionId;
+              console.log(`  ✅ Session created: ${sessionId}`);
 
-            resolve({
-              sessionId,
-              status: "open",
-            });
+              resolve({
+                sessionId,
+                status: "open",
+              });
+              break;
+
+            case RPCMethod.Error:
+              console.error("  ❌ ClearNode error:", response.params);
+              ws.removeEventListener("message", handleMessage);
+              reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
+              break;
           }
         } catch (error) {
           console.error("  ❌ Error parsing session response:", error);
@@ -391,7 +296,7 @@ export async function createGameSession(
  */
 export async function sendGameMessage(
   ws: WebSocket,
-  signer: any,
+  signer: MessageSigner,
   sessionId: Hex,
   messageData: any
 ): Promise<void> {
@@ -404,7 +309,7 @@ export async function sendGameMessage(
  */
 export async function closeGameSession(
   ws: WebSocket,
-  signer: any,
+  signer: MessageSigner,
   sessionId: Hex,
   finalAllocations: Array<{
     participant: Address;
@@ -428,7 +333,7 @@ export async function closeGameSession(
 /**
  * Create a message signer from a wallet
  */
-export function createMessageSigner(wallet: WalletClient) {
+export function createMessageSigner(wallet: WalletClient): MessageSigner {
   return async (message: any) => {
     if (!wallet.account) throw new Error("No account in wallet");
 
@@ -437,34 +342,4 @@ export function createMessageSigner(wallet: WalletClient) {
       account: wallet.account,
     });
   };
-}
-
-/**
- * Wait for WebSocket message matching a condition
- */
-export function waitForMessage(
-  ws: WebSocket,
-  condition: (data: any) => boolean,
-  timeout: number = 30000
-): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (condition(data)) {
-          ws.removeEventListener("message", handleMessage);
-          resolve(data);
-        }
-      } catch (error) {
-        // Ignore parsing errors
-      }
-    };
-
-    ws.addEventListener("message", handleMessage);
-
-    setTimeout(() => {
-      ws.removeEventListener("message", handleMessage);
-      reject(new Error("Message wait timeout"));
-    }, timeout);
-  });
 }

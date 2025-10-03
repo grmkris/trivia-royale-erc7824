@@ -29,16 +29,41 @@ export function createNitroliteClient(
 
 /**
  * Check if channel exists between player and server
- * TODO: Implement actual channel lookup logic
  */
 export async function findChannel(
   playerAddress: `0x${string}`,
-  serverAddress: `0x${string}`
+  serverAddress: `0x${string}`,
+  playerNitroliteClient: NitroliteClient,
 ): Promise<string | null> {
-  // Query contract for existing channel
-  // Return channelId or null
-  // For now, return null (will always create new channels)
-  return null;
+  try {
+    const publicClient = createPublicRpcClient();
+
+    // Get all open channels for the player
+    const channelIds = await playerNitroliteClient.getOpenChannels();
+
+    // Check each channel to see if it's between player and server
+    for (const channelId of channelIds) {
+      const channelData = await playerNitroliteClient.getChannelData(channelId);
+      const participants = channelData.channel.participants;
+
+      // Check if both player and server are participants
+      const hasPlayer = participants.some(
+        (addr) => addr.toLowerCase() === playerAddress.toLowerCase()
+      );
+      const hasServer = participants.some(
+        (addr) => addr.toLowerCase() === serverAddress.toLowerCase()
+      );
+
+      if (hasPlayer && hasServer) {
+        return channelId;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error finding channel:', error);
+    return null;
+  }
 }
 
 /**
@@ -117,12 +142,16 @@ export async function createChannel(
  * Ensure channel exists, create if needed
  */
 export async function ensureChannel(
+  props: {
+    playerNitroliteClient: NitroliteClient,
   playerWallet: Wallet,
   serverWallet: Wallet,
   amount: string
+  }
 ): Promise<string> {
+  const { playerNitroliteClient, playerWallet, serverWallet, amount } = props;
   // Check existing
-  const existing = await findChannel(playerWallet.address, serverWallet.address);
+  const existing = await findChannel(playerWallet.address, serverWallet.address, playerNitroliteClient);
 
   if (existing) {
     console.log(`  ✅ ${playerWallet.name}: Channel exists (${existing.slice(0, 10)}...)`);

@@ -78,34 +78,13 @@ import {
   type Wallet,
 } from './utils/wallets';
 import { SEPOLIA_CONFIG } from './utils/contracts';
-import { ensureChannel } from './utils/channels';
+import { createNitroliteClient, ensureChannel } from './utils/channels';
 import { connectAllParticipants, disconnectAll } from './utils/clearnode';
-import {
-  createGameSession,
-  sendGameMessage,
-  closeGameSession,
-  createMessageSigner,
-} from './yellow-integration';
-
-// ==================== TYPES ====================
-
-interface CommitData {
-  commitment: `0x${string}`;
-  secret: `0x${string}`;
-  answer: string;
-  receivedAt: number;
-}
-
-interface GameResults {
-  wins: Map<string, number>;
-}
-
-interface PrizeDistribution {
-  name: string;
-  wins: number;
-  prize: string;
-  change: string;
-}
+import { createMessageSigner } from './yellow-integration';
+import type { NitroliteClient } from '@erc7824/nitrolite';
+import { createServerClient } from './game/ServerGameClient';
+import { createPlayerClient } from './game/PlayerGameClient';
+import type { GameResults, PrizeDistribution, PlayerMockConfig } from './game/types';
 
 // ==================== GAME DATA ====================
 
@@ -115,44 +94,46 @@ const QUESTIONS = [
   { question: 'Who created Bitcoin?', answer: 'Satoshi Nakamoto' },
 ];
 
-const MOCK_ANSWERS = [
-  { answer: '2009', delay: 1200 },  // Alice
-  { answer: '2008', delay: 800 },   // Bob (wrong, but fast)
-  { answer: '2009', delay: 1500 },  // Charlie
-  { answer: '2010', delay: 2000 },  // Diana (wrong)
-  { answer: '2009', delay: 2100 },  // Eve
-];
+// Mock configurations for each player (demo mode)
+const PLAYER_MOCK_CONFIGS: Record<string, PlayerMockConfig> = {
+  Alice: {
+    answers: [
+      { answer: '2009', delay: 1200 },                 // Round 1: ✓ WINNER
+      { answer: 'Ether', delay: 1500 },                // Round 2: ✗
+      { answer: 'Satoshi', delay: 2000 },              // Round 3: ✗
+    ],
+  },
+  Bob: {
+    answers: [
+      { answer: '2008', delay: 800 },                  // Round 1: ✗ (fast but wrong)
+      { answer: 'ETH', delay: 1800 },                  // Round 2: ✓
+      { answer: 'Satoshi Nakamoto', delay: 1000 },     // Round 3: ✓ WINNER
+    ],
+  },
+  Charlie: {
+    answers: [
+      { answer: '2009', delay: 1500 },                 // Round 1: ✓
+      { answer: 'ETH', delay: 900 },                   // Round 2: ✓ WINNER (fastest)
+      { answer: 'Satoshi Nakamoto', delay: 1600 },     // Round 3: ✓
+    ],
+  },
+  Diana: {
+    answers: [
+      { answer: '2009', delay: 2000 },                 // Round 1: ✓
+      { answer: 'Ethereum', delay: 2200 },             // Round 2: ✗
+      { answer: 'Satoshi Nakamoto', delay: 2500 },     // Round 3: ✓
+    ],
+  },
+  Eve: {
+    answers: [
+      { answer: '2010', delay: 2500 },                 // Round 1: ✗
+      { answer: 'ETH', delay: 2800 },                  // Round 2: ✓
+      { answer: 'Hal Finney', delay: 3000 },           // Round 3: ✗
+    ],
+  },
+};
 
 // ==================== HELPER FUNCTIONS ====================
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function generateSecret(): `0x${string}` {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return `0x${Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')}`;
-}
-
-function createCommitment(
-  answer: string,
-  secret: `0x${string}`,
-  address: `0x${string}`
-): `0x${string}` {
-  return keccak256(
-    encodePacked(['string', 'bytes32', 'address'], [answer, secret, address])
-  );
-}
-
-function verifyCommitment(
-  answer: string,
-  secret: `0x${string}`,
-  address: `0x${string}`,
-  commitment: `0x${string}`
-): boolean {
-  const expected = createCommitment(answer, secret, address);
-  return expected === commitment;
-}
 
 function calculatePrizes(results: [string, number][]): PrizeDistribution[] {
   const entryFee = parseFloat(SEPOLIA_CONFIG.game.entryFee);
@@ -172,8 +153,8 @@ function calculatePrizes(results: [string, number][]): PrizeDistribution[] {
     return {
       name,
       wins,
-      prize: finalPrize.toFixed(3),
-      change: change.toFixed(3),
+      prize: finalPrize.toFixed(6),
+      change: change.toFixed(6),
     };
   });
 }
@@ -182,14 +163,19 @@ function calculatePrizes(results: [string, number][]): PrizeDistribution[] {
 
 async function setupChannels(
   players: Wallet[],
-  server: Wallet
+  server: Wallet,
 ): Promise<string[]> {
   console.log('2. Creating channels (on-chain)...\n');
 
   const channelIds: string[] = [];
 
   for (const player of players) {
-    const channelId = await ensureChannel(player, server, '0.0001');
+    const channelId = await ensureChannel({
+      playerNitroliteClient: createNitroliteClient(player, server.address),
+      playerWallet: player,
+      serverWallet: server,
+      amount: '0.0001',
+    });
     channelIds.push(channelId);
   }
 
@@ -197,138 +183,60 @@ async function setupChannels(
   return channelIds;
 }
 
-async function collectCommits(
-  players: Wallet[],
-  connections: Map<string, WebSocket>,
-  sessionId: Hex,
-  questionSentAt: number
-): Promise<Map<string, CommitData>> {
-  const commits = new Map<string, CommitData>();
-
-  for (let i = 0; i < players.length; i++) {
-    const player = players[i];
-    const mockAnswer = MOCK_ANSWERS[i];
-
-    if (!player || !mockAnswer) continue;
-
-    await delay(mockAnswer.delay);
-
-    const receivedAt = Date.now();
-    const elapsed = receivedAt - questionSentAt;
-
-    if (elapsed > SEPOLIA_CONFIG.game.commitTimeoutMs) {
-      console.log(`   ❌ ${player.name}: Too late! (${elapsed}ms)`);
-      continue;
-    }
-
-    const secret = generateSecret();
-    const commitment = createCommitment(mockAnswer.answer, secret, player.address);
-
-    // Send commit via ClearNode
-    const playerWs = connections.get(player.name);
-    if (!playerWs) continue;
-
-    const playerSigner = createMessageSigner(player.client);
-
-    await sendGameMessage(playerWs, playerSigner, sessionId, {
-      type: 'commit',
-      commitment,
-      timestamp: receivedAt,
-    });
-
-    commits.set(player.name, {
-      commitment,
-      secret,
-      answer: mockAnswer.answer,
-      receivedAt,
-    });
-
-    console.log(`   ✅ ${player.name}: Committed (${elapsed}ms)`);
-  }
-
-  return commits;
-}
-
-async function processReveals(
-  commits: Map<string, CommitData>,
-  players: Wallet[],
-  connections: Map<string, WebSocket>,
-  sessionId: Hex,
-  correctAnswer: string,
-  questionSentAt: number
-): Promise<string | null> {
-  const correctReveals: Array<{ name: string; time: number }> = [];
-
-  for (const [name, commit] of commits) {
-    const player = players.find(p => p.name === name);
-    if (!player) continue;
-
-    const playerWs = connections.get(name);
-    if (!playerWs) continue;
-
-    const playerSigner = createMessageSigner(player.client);
-
-    // Send reveal via ClearNode
-    await sendGameMessage(playerWs, playerSigner, sessionId, {
-      type: 'reveal',
-      answer: commit.answer,
-      secret: commit.secret,
-    });
-
-    // Verify commitment
-    const isValid = verifyCommitment(
-      commit.answer,
-      commit.secret,
-      player.address,
-      commit.commitment
-    );
-
-    if (!isValid) {
-      console.log(`   ❌ ${name}: Invalid reveal!`);
-      continue;
-    }
-
-    const isCorrect = commit.answer === correctAnswer;
-    const icon = isCorrect ? '✓' : '✗';
-    console.log(`   ${icon} ${name}: "${commit.answer}"`);
-
-    if (isCorrect) {
-      correctReveals.push({
-        name,
-        time: commit.receivedAt - questionSentAt,
-      });
-    }
-  }
-
-  if (correctReveals.length === 0) {
-    console.log('\n💀 No winners\n');
-    return null;
-  }
-
-  correctReveals.sort((a, b) => a.time - b.time);
-  const winner = correctReveals[0];
-  if (!winner) return null;
-
-  console.log(`\n🏆 WINNER: ${winner.name} (${winner.time}ms)\n`);
-  return winner.name;
-}
-
 async function playGame(
   players: Wallet[],
   server: Wallet,
   connections: Map<string, WebSocket>,
-  sessionId: Hex
-): Promise<GameResults> {
-  console.log('🎲 PLAYING TRIVIA GAME\n');
+  participants: Address[],
+  initialAllocations: Array<{ participant: Address; asset: string; amount: string }>
+): Promise<{ results: GameResults; sessionId: Hex; gameClients: { server: any; players: any[] } }> {
+  console.log('🎲 SETTING UP GAME\n');
 
   const results: GameResults = { wins: new Map() };
   players.forEach(p => results.wins.set(p.name, 0));
 
+  // Create server client
   const serverWs = connections.get(server.name);
   if (!serverWs) throw new Error('Server not connected');
 
   const serverSigner = createMessageSigner(server.client);
+  const serverClient = createServerClient({
+    ws: serverWs,
+    signer: serverSigner,
+    participants,
+    serverAddress: server.address,
+  });
 
+  // Create player clients
+  const playerClients = players.map(player => {
+    const playerWs = connections.get(player.name);
+    if (!playerWs) throw new Error(`Player ${player.name} not connected`);
+
+    const playerSigner = createMessageSigner(player.client);
+    const mockConfig = PLAYER_MOCK_CONFIGS[player.name];
+
+    return createPlayerClient({
+      ws: playerWs,
+      signer: playerSigner,
+      wallet: player,
+      mockConfig,
+    });
+  });
+
+  // Start all clients (BEFORE creating session!)
+  await serverClient.start();
+  await Promise.all(playerClients.map(client => client.start()));
+
+  console.log('  ✅ All game clients ready\n');
+
+  // NOW create the session (clients are listening)
+  console.log('  🎮 Creating game session...\n');
+  const sessionId = await serverClient.createGame(initialAllocations);
+  console.log(`  ✅ Session created: ${sessionId}\n`);
+
+  console.log('🎲 PLAYING TRIVIA GAME\n');
+
+  // Play rounds
   for (let roundNum = 0; roundNum < SEPOLIA_CONFIG.game.rounds; roundNum++) {
     const question = QUESTIONS[roundNum];
     if (!question) break;
@@ -337,44 +245,73 @@ async function playGame(
     console.log(`ROUND ${roundNum + 1}: ${question.question}`);
     console.log('='.repeat(60) + '\n');
 
-    // Server broadcasts question via ClearNode
+    // COMMIT PHASE
     console.log('📝 COMMIT PHASE (5 seconds)\n');
 
-    await sendGameMessage(serverWs, serverSigner, sessionId, {
-      type: 'question',
-      question: question.question,
-      round: roundNum + 1,
-      timestamp: Date.now(),
-    });
-
-    const questionSentAt = Date.now();
-
-    // Collect commits from players
-    const commits = await collectCommits(
-      players,
-      connections,
+    const questionSentAt = await serverClient.broadcastQuestion(
       sessionId,
-      questionSentAt
+      question.question,
+      roundNum + 1,
+      SEPOLIA_CONFIG.game.commitTimeoutMs
     );
 
-    // Process reveals
-    console.log('\n🔓 REVEAL PHASE\n');
-
-    const winner = await processReveals(
-      commits,
-      players,
-      connections,
-      sessionId,
-      question.answer,
-      questionSentAt
+    // Collect commits (players auto-respond via their clients)
+    const commits = await serverClient.collectCommits(
+      questionSentAt,
+      SEPOLIA_CONFIG.game.commitTimeoutMs
     );
+
+    console.log(`\n   📥 Collected ${commits.size} commits\n`);
+
+    // REVEAL PHASE
+    console.log('🔓 REVEAL PHASE\n');
+
+    await serverClient.requestReveals(sessionId, roundNum + 1);
+
+    const reveals = await serverClient.collectReveals(
+      questionSentAt,
+      2000 // Give 2 seconds for reveals
+    );
+
+    // Display reveals
+    for (const [address, reveal] of reveals) {
+      const player = players.find(p => p.address === address);
+      const icon = reveal.isCorrect ? '✓' : '✗';
+      const validIcon = reveal.isValid ? '' : '⚠️ ';
+      console.log(`   ${validIcon}${icon} ${player?.name}: "${reveal.answer}"`);
+    }
+
+    // Determine winner
+    const winner = serverClient.determineWinner(reveals, question.answer);
 
     if (winner) {
-      results.wins.set(winner, (results.wins.get(winner) || 0) + 1);
+      const winnerPlayer = players.find(p => p.address === winner.playerAddress);
+      if (winnerPlayer) {
+        console.log(`\n🏆 WINNER: ${winnerPlayer.name} (${winner.responseTime}ms)\n`);
+        results.wins.set(winnerPlayer.name, (results.wins.get(winnerPlayer.name) || 0) + 1);
+      }
+    } else {
+      console.log('\n💀 No winners\n');
     }
+
+    // Broadcast result
+    await serverClient.broadcastResult(
+      sessionId,
+      roundNum + 1,
+      winner,
+      question.answer
+    );
   }
 
-  return results;
+  // Return results, session ID, and clients (for cleanup)
+  return {
+    results,
+    sessionId,
+    gameClients: {
+      server: serverClient,
+      players: playerClients,
+    },
+  };
 }
 
 function displayResults(results: GameResults): PrizeDistribution[] {
@@ -432,33 +369,27 @@ async function main() {
 
   console.log(`   ✅ All ${connections.size} participants connected\n`);
 
-  // ==================== APPLICATION SESSION ====================
-  console.log('4. Creating application session...\n');
-
-  const serverWs = connections.get(server.name);
-  if (!serverWs) throw new Error('Server not connected');
-
-  const serverSigner = createMessageSigner(server.client);
-
-  const session = await createGameSession(
-    serverWs,
-    serverSigner,
-    allParticipants.map(p => p.address),
-    players.map(p => ({
-      participant: p.address,
-      asset: 'eth',
-      amount: SEPOLIA_CONFIG.game.entryFee,
-    })).concat([{
-      participant: server.address,
-      asset: 'eth',
-      amount: '0.02',
-    }])
-  );
-
-  console.log(`   ✅ Session created: ${session.sessionId}\n`);
-
   // ==================== PLAY GAME ====================
-  const results = await playGame(players, server, connections, session.sessionId);
+  console.log('4. Setting up game clients and playing...\n');
+
+  const allParticipantsForSession = [...players, server];
+  const initialAllocations: Array<{
+    participant: `0x${string}`;
+    asset: string;
+    amount: string;
+  }> = allParticipantsForSession.map(p => ({
+    participant: p.address,
+    asset: 'eth',
+    amount: '0', // Start with 0 - funds already locked in channels
+  }));
+
+  const { results, sessionId, gameClients } = await playGame(
+    players,
+    server,
+    connections,
+    allParticipantsForSession.map(p => p.address),
+    initialAllocations
+  );
 
   // ==================== DISPLAY RESULTS ====================
   const prizes = displayResults(results);
@@ -467,15 +398,18 @@ async function main() {
   console.log('\n🔒 CLEANUP PHASE\n');
 
   console.log('1. Closing application session...');
-  await closeGameSession(
-    serverWs,
-    serverSigner,
-    session.sessionId,
+  await gameClients.server.endGame(
+    sessionId,
     [] // Final allocations would be calculated from prizes
   );
   console.log('   ✅ Session closed\n');
 
-  console.log('2. Disconnecting from ClearNode...');
+  console.log('2. Cleaning up game clients...');
+  gameClients.server.cleanup();
+  gameClients.players.forEach(client => client.cleanup());
+  console.log('   ✅ Clients cleaned up\n');
+
+  console.log('3. Disconnecting from ClearNode...');
   disconnectAll(connections);
   console.log('   ✅ All disconnected\n');
 

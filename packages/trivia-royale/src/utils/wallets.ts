@@ -43,6 +43,10 @@ export interface Wallets {
 export function loadWallets(): Wallets {
   const mnemonic = env.MNEMONIC;
 
+  if (!mnemonic) {
+    throw new Error('MNEMONIC is required - run `bun run prepare` first');
+  }
+
   const walletArray = WALLET_NAMES.map((name, index) => {
     const account = mnemonicToAccount(mnemonic, { accountIndex: index });
     const client = createWalletClient({

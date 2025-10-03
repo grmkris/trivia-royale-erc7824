@@ -13,14 +13,14 @@
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "^1.2.23"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "@erc7824/nitrolite": "^0.3.0",
-    "viem": "^2.37.11",
+    "viem": "^2.37.12",
     "zod": "^4.1.11"
   }
 }
