@@ -1,5 +1,5 @@
 import { mnemonicToAccount, generateMnemonic, english } from 'viem/accounts';
-import type { Account, WalletClient, Chain, Transport, ParseAccount } from 'viem';
+import type { Account, WalletClient, Chain, Transport, ParseAccount, PublicClient, Address } from 'viem';
 import { createWalletClient, createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
 import { env } from '../env';
@@ -30,11 +30,12 @@ export interface Wallet {
   name: string;
   index: number;
   account: Account;
-  client: WalletClient<Transport, Chain, ParseAccount<Account>>;
-  address: `0x${string}`;
+  walletClient: WalletClient;
+  publicClient: PublicClient; 
+  address: Address;
   // Session keypair for ClearNode operations (signing states, RPC messages)
   sessionPrivateKey: `0x${string}`;
-  sessionAddress: `0x${string}`;
+  sessionAddress: Address;
 }
 
 /**
@@ -75,8 +76,12 @@ export function loadWallets(): Wallets {
 
   const walletArray = WALLET_NAMES.map((name, index) => {
     const account = mnemonicToAccount(mnemonic, { accountIndex: index });
-    const client = createWalletClient({
+    const walletClient = createWalletClient({
       account,
+      chain: sepolia,
+      transport: http(),
+    });
+    const publicClient = createPublicClient({
       chain: sepolia,
       transport: http(),
     });
@@ -88,7 +93,8 @@ export function loadWallets(): Wallets {
       name,
       index,
       account,
-      client,
+      walletClient,
+      publicClient,
       address: account.address,
       sessionPrivateKey: sessionKeypair.privateKey,
       sessionAddress: sessionKeypair.address,

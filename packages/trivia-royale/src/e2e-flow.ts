@@ -115,7 +115,7 @@ async function checkBalances(
     SEPOLIA_CONFIG.contracts.brokerAddress as Address
   );
 
-  const walletBalance = await getUSDCBalance(wallet, wallet.address);
+  const walletBalance = await getUSDCBalance(wallet);
   const ledgerBalances = await getLedgerBalances(ws, wallet);
   const ledgerBalance =
     ledgerBalances.find((b) => b.asset === SEPOLIA_CONFIG.game.asset)?.amount ||
@@ -440,7 +440,7 @@ async function main() {
     await withdraw(test10);
 
     // Final balances
-    const finalWalletBalance = await getUSDCBalance(test10, test10.address);
+    const finalWalletBalance = await getUSDCBalance(test10);
     console.log(`\n🎉 COMPLETE!\n`);
     console.log(`   Initial wallet: ${formatUSDC(initialBalances.walletBalance)} USDC`);
     console.log(`   Final wallet:   ${formatUSDC(finalWalletBalance)} USDC`);

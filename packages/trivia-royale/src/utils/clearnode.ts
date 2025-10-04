@@ -537,7 +537,7 @@ export async function getLedgerBalances(
 ): Promise<Array<{ asset: string; amount: string }>> {
   return new Promise(async (resolve, reject) => {
     try {
-      const signer = createMessageSigner(wallet.client);
+      const signer = createMessageSigner(wallet.walletClient);
 
       // Create message handler
       const handleMessage = (event: MessageEvent) => {
@@ -545,7 +545,6 @@ export async function getLedgerBalances(
           const response = parseAnyRPCResponse(event.data);
 
           if (response.method === RPCMethod.GetLedgerBalances) {
-            console.log(`  🔍 ${wallet.name}: Received ledger balances`, response.params.ledgerBalances);
             ws.removeEventListener('message', handleMessage);
             // Response format: params is the array of balances
             resolve(response.params.ledgerBalances || []);

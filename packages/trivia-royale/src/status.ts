@@ -20,7 +20,7 @@ import { connectToClearNode, authenticateClearNode } from './yellow-integration'
 import { getLedgerBalances } from './utils/clearnode';
 import { getUSDCBalance, formatUSDC } from './utils/erc20';
 import { formatEther } from 'viem';
-
+import { getChannelWithBroker } from './utils/clearnode';
 /**
  * Format USDC with more decimals for precision
  */
@@ -81,7 +81,7 @@ async function main() {
 
   for (const wallet of walletsToShow) {
     const ethBalance = await publicClient.getBalance({ address: wallet.address });
-    const usdcBalance = await getUSDCBalance(wallet, wallet.address);
+    const usdcBalance = await getUSDCBalance(wallet);
 
     const icon = getRoleIcon(wallet.name);
     const ethFormatted = formatEther(ethBalance).padStart(12);
@@ -152,7 +152,9 @@ async function main() {
     try {
       // Create read-only NitroliteClient
       const client = new NitroliteClient({
+        // @ts-expect-error - wallet.client is a WalletClient
         publicClient,
+        // @ts-expect-error - wallet.client is a WalletClient
         walletClient: wallet.client,
         stateSigner: null as any, // Not needed for read operations
         challengeDuration: 3600n,
@@ -169,7 +171,13 @@ async function main() {
 
       // Get open channels
       const channelIds = await client.getOpenChannels();
-
+      const ws = await connectToClearNode(SEPOLIA_CONFIG.clearNodeUrl);
+      const brokerChannel = await getChannelWithBroker(ws, wallet, wallet.address);
+      if (brokerChannel) {
+      console.log(`│  🏦 Broker Channel: ${brokerChaxnnel}`);
+        const channelData = await client.getChannelData(brokerChannel);
+        console.log(`│  🏦 Channel Data: ${channelData.channel.nonce}`);  
+      }
       console.log(`┌─ ${wallet.name} (${wallet.address.slice(0, 10)}...${wallet.address.slice(-8)})`);
       console.log(`│  💰 Custody Balance: ${formatUsdcBalance(custodyBalance)} USDC`);
       console.log(`│  📊 Open Channels: ${channelIds.length}`);
@@ -178,6 +186,7 @@ async function main() {
         console.log('│');
         for (let i = 0; i < channelIds.length; i++) {
           const channelId = channelIds[i];
+          if (!channelId) break;
           const channelData = await client.getChannelData(channelId);
           const channelBalance = await client.getChannelBalance(
             channelId,

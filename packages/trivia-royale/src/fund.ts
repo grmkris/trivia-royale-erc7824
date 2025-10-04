@@ -14,6 +14,7 @@ import {
 import { SEPOLIA_CONFIG } from './utils/contracts';
 import { transferUSDC, getUSDCBalance, formatUSDC, parseUSDC } from './utils/erc20';
 import { formatEther, parseEther } from 'viem';
+import { sepolia } from 'viem/chains';
 
 /**
  * Send ETH from funding wallet to target wallet (for gas)
@@ -25,10 +26,11 @@ async function sendETH(
 ): Promise<void> {
   const amountWei = parseEther(amount);
 
-  const hash = await funding.client.sendTransaction({
+  const hash = await funding.walletClient.sendTransaction({
     account: funding.account,
     to: target.address,
     value: amountWei,
+    chain: sepolia,
   });
 
   console.log(`   ✅ ${target.name}: Sent ${amount} ETH (gas) (tx: ${hash.slice(0, 10)}...)`);
@@ -119,7 +121,7 @@ async function main() {
 
   // Check funding wallet balances
   const fundingEthBalance = await publicClient.getBalance({ address: funding.address });
-  const fundingUsdcBalance = await getUSDCBalance(funding, funding.address);
+  const fundingUsdcBalance = await getUSDCBalance(funding);
 
   console.log('💰 Funding Wallet:\n');
   console.log(`   Address: ${funding.address}`);
@@ -187,14 +189,14 @@ async function main() {
   // Show final balances
   console.log('\n💰 Final Balances:\n');
 
-  for (const wallet of [...gasRecipients]) {
+  for (const wallet of [...gasRecipients]) {  
     const ethBalance = await publicClient.getBalance({ address: wallet.address });
-    const usdcBalance = await getUSDCBalance(funding, wallet.address);
+    const usdcBalance = await getUSDCBalance(wallet);
     console.log(`   ${wallet.name.padEnd(8)}: ${formatEther(ethBalance).padStart(10)} ETH | ${formatUSDC(usdcBalance).padStart(10)} USDC`);
   }
 
   const finalFundingEth = await publicClient.getBalance({ address: funding.address });
-  const finalFundingUsdc = await getUSDCBalance(funding, funding.address);
+  const finalFundingUsdc = await getUSDCBalance(funding);
   console.log(`   ${funding.name.padEnd(8)}: ${formatEther(finalFundingEth).padStart(10)} ETH | ${formatUSDC(finalFundingUsdc).padStart(10)} USDC (remaining)\n`);
 
   console.log('📋 Next Steps:');

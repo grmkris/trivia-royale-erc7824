@@ -103,7 +103,7 @@ export async function authenticateClearNode(
   allowances: Array<{ asset: string; amount: string }> = []
 ): Promise<void> {
   return new Promise(async (resolve, reject) => {
-    const account = wallet.client.account;
+    const account = wallet.account;
     if (!account) {
       reject(new Error("No account found in wallet"));
       return;
@@ -159,7 +159,8 @@ export async function authenticateClearNode(
 
               // Create EIP-712 message signer (SDK handles signing)
               const signer = createEIP712AuthMessageSigner(
-                wallet.client,
+                // @ts-expect-error - wallet.walletClient is a WalletClient
+                wallet.walletClient,
                 partialMessage,
                 AUTH_DOMAIN
               );
@@ -522,7 +523,7 @@ export async function closeGameSession(
  * Note: Auth messages use createEIP712AuthMessageSigner, other RPC methods use raw ECDSA.
  */
 export function createMessageSigner(wallet: WalletClient): MessageSigner {
-  return async (payload: any) => {
+  return async (payload) => {
     if (!wallet.account) throw new Error("No account in wallet");
 
     // Match SDK's ECDSA signer pattern:
@@ -538,7 +539,7 @@ export function createMessageSigner(wallet: WalletClient): MessageSigner {
 
     const hash = keccak256(message);
     const signature = await wallet.account.sign?.({ hash });
-
+    if (!signature) throw new Error("Failed to sign message");
     return signature;
   };
 }

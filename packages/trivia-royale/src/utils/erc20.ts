@@ -30,15 +30,15 @@ export function formatUSDC(amount: bigint): string {
  */
 export function createErc20Service(wallet: Wallet): Erc20Service {
   const publicClient = createPublicRpcClient();
-  return new Erc20Service(publicClient, wallet.client, wallet.account);
+  return new Erc20Service(wallet.publicClient, wallet.walletClient, wallet.account);
 }
 
 /**
  * Get USDC balance for an address
  */
-export async function getUSDCBalance(wallet: Wallet, address: Address): Promise<bigint> {
+export async function getUSDCBalance(wallet: Wallet): Promise<bigint> {
   const erc20Service = createErc20Service(wallet);
-  return await erc20Service.getTokenBalance(SEPOLIA_CONFIG.contracts.tokenAddress, address);
+  return await erc20Service.getTokenBalance(SEPOLIA_CONFIG.contracts.tokenAddress, wallet.address);
 }
 
 /**
@@ -96,7 +96,7 @@ export async function transferUSDC(
   const amountWei = parseUSDC(amount);
 
   // Use wallet client to call ERC20 transfer function
-  const hash = await fromWallet.client.writeContract({
+  const hash = await fromWallet.walletClient.writeContract({
     address: SEPOLIA_CONFIG.contracts.tokenAddress,
     abi: [
       {
@@ -113,6 +113,7 @@ export async function transferUSDC(
     functionName: 'transfer',
     args: [to, amountWei],
     account: fromWallet.account,
+    chain: sepolia,
   });
 
   return hash;

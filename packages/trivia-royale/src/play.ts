@@ -280,7 +280,7 @@ async function playGame(
   const serverWs = connections.get(server.name);
   if (!serverWs) throw new Error('Server not connected');
 
-  const serverSigner = createMessageSigner(server.client);
+  const serverSigner = createMessageSigner(server.walletClient);
   const serverClient = createServerClient({
     ws: serverWs,
     signer: serverSigner,
@@ -293,7 +293,7 @@ async function playGame(
     const playerWs = connections.get(player.name);
     if (!playerWs) throw new Error(`Player ${player.name} not connected`);
 
-    const playerSigner = createMessageSigner(player.client);
+    const playerSigner = createMessageSigner(player.walletClient);
     const mockConfig = PLAYER_MOCK_CONFIGS[player.name];
 
     return createPlayerClient({
@@ -318,7 +318,7 @@ async function playGame(
   for (const player of players) {
     const allocation = initialAllocations.find(a => a.participant === player.address);
     if (allocation && allocation.amount !== '0') {
-      playerSigners.set(player.address, createMessageSigner(player.client));
+      playerSigners.set(player.address, createMessageSigner(player.walletClient));
     }
   }
 

@@ -34,7 +34,7 @@ async function cashout(wallet: Wallet) {
   // Step 1: Check all balances
   console.log('📊 Current Balances:\n');
 
-  const walletBalance = await getUSDCBalance(wallet, wallet.address);
+  const walletBalance = await getUSDCBalance(wallet);
   console.log(`   Wallet:  ${formatUSDC(walletBalance)} USDC`);
 
   // Connect to ClearNode
@@ -99,7 +99,7 @@ async function cashout(wallet: Wallet) {
   }
 
   // Step 4: Verify final balance
-  const finalWalletBalance = await getUSDCBalance(wallet, wallet.address);
+  const finalWalletBalance = await getUSDCBalance(wallet);
   const finalLedgerBalances = await getLedgerBalances(ws, wallet);
   const finalLedgerBalance = finalLedgerBalances.find(b => b.asset === SEPOLIA_CONFIG.game.asset);
 
