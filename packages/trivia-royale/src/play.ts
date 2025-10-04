@@ -14,7 +14,7 @@
  * - Locks funds on-chain in custody contract (0.0001 ETH per player)
  * - Enables off-chain state updates without gas fees
  * - Secure: Funds escrowed on-chain, can't be stolen
- * - Used in: Line 364 via `setupChannels()`
+ * - Used in: Line 387 via `setupChannelsViaRPC()`
  *
  * Layer 2: CLEARNODE (Off-Chain Messaging)
  * -----------------------------------------
@@ -23,7 +23,7 @@
  * - Authentication: Challenge-response with wallet signatures
  * - Fast: Messages propagate instantly (no block confirmations)
  * - Free: Zero gas fees for messages
- * - Used in: Line 370 via `connectAllParticipants()`
+ * - Used in: Line 382 via `connectAllParticipants()`
  *
  * Layer 3: APPLICATION SESSIONS (Multi-Party Coordination)
  * ---------------------------------------------------------
@@ -31,7 +31,7 @@
  * - Server controls game flow (weights: [0,0,0,0,0,100])
  * - Routes messages between all participants via ClearNode
  * - Tracks allocations (entry fees, prize distributions)
- * - Used in: Line 382 via `createGameSession()`
+ * - Used in: Line 390+ via game clients
  *
  * ========================================
  * WHAT'S GAME LOGIC (Not Yellow SDK):
@@ -65,23 +65,31 @@
  * COMPLETE FLOW:
  * ========================================
  *
- * 1. Create channels (on-chain) - Line 364
- * 2. Connect to ClearNode (off-chain WebSocket) - Line 370
- * 3. Create application session (6 participants) - Line 382
- * 4. Play trivia game via ClearNode messages - Line 400
- * 5. Close session and disconnect - Line 409
+ * 1. Connect to ClearNode (off-chain WebSocket) - Line 382
+ * 2. Create channels via RPC (on-chain + ledger tracking) - Line 387
+ * 3. Create application session (6 participants) - Line 390+
+ * 4. Play trivia game via ClearNode messages - Line 390+
+ * 5. Close session and disconnect - Line 438+
  */
 
-import { parseEther, formatEther, keccak256, encodePacked, type Hex } from 'viem';
+import { parseEther, formatEther, keccak256, encodePacked, type Hex, type Address, parseUnits } from 'viem';
 import {
   loadWallets,
   type Wallet,
 } from './utils/wallets';
 import { SEPOLIA_CONFIG } from './utils/contracts';
-import { createNitroliteClient, ensureChannel } from './utils/channels';
-import { connectAllParticipants, disconnectAll } from './utils/clearnode';
-import { createMessageSigner } from './yellow-integration';
-import type { NitroliteClient } from '@erc7824/nitrolite';
+import {
+  connectAllParticipants,
+  disconnectAll,
+  createChannelViaRPC,
+  getChannelWithBroker,
+  closeChannelViaRPC,
+  authenticateForAppSession,
+  ensureSufficientBalance,
+  getLedgerBalances,
+} from './utils/clearnode';
+import { createMessageSigner, createGameSessionWithMultiSig } from './yellow-integration';
+import type { MessageSigner, NitroliteClient } from '@erc7824/nitrolite';
 import { createServerClient } from './game/ServerGameClient';
 import { createPlayerClient } from './game/PlayerGameClient';
 import type { GameResults, PrizeDistribution, PlayerMockConfig } from './game/types';
@@ -161,25 +169,62 @@ function calculatePrizes(results: [string, number][]): PrizeDistribution[] {
 
 // ==================== GAME FLOW ====================
 
-async function setupChannels(
+/**
+ * Create channels via ClearNode RPC
+ *
+ * This creates channels that ClearNode knows about and tracks in its database.
+ * Requires active WebSocket connections.
+ */
+async function setupChannelsViaRPC(
   players: Wallet[],
-  server: Wallet,
-): Promise<string[]> {
-  console.log('2. Creating channels (on-chain)...\n');
+  connections: Map<string, WebSocket>,
+): Promise<Map<string, string>> {
+  console.log('2. Creating channels via ClearNode (on-chain + ledger tracking)...\n');
 
-  const channelIds: string[] = [];
+  const channelIds = new Map<string, string>(); // Map of player name -> channel ID
 
   for (const player of players) {
-    const channelId = await ensureChannel({
-      playerNitroliteClient: createNitroliteClient(player, server.address),
-      playerWallet: player,
-      serverWallet: server,
-      amount: '0.0001',
-    });
-    channelIds.push(channelId);
+    const ws = connections.get(player.name);
+    if (!ws) {
+      throw new Error(`No WebSocket connection for ${player.name}`);
+    }
+
+    try {
+      // Check if channel already exists
+      const existingChannel = await getChannelWithBroker(ws, player, SEPOLIA_CONFIG.contracts.brokerAddress);
+
+      let channelId: string;
+      if (existingChannel) {
+        // Check if existing channel has balance
+        const balances = await getLedgerBalances(ws, player);
+        const balance = balances.find(b => b.asset === SEPOLIA_CONFIG.game.asset);
+
+        if (!balance || BigInt(parseUnits(balance.amount, 18)) === 0n) {
+          // Channel exists but is drained - close it and create a fresh one
+          console.log(`  🔄 ${player.name}: Closing drained channel...`);
+          await closeChannelViaRPC(ws, player, existingChannel);
+          console.log(`  ⏳ ${player.name}: Creating fresh channel...`);
+          channelId = await createChannelViaRPC(ws, player, SEPOLIA_CONFIG.game.channelDeposit);
+          console.log(`  ✅ ${player.name}: Fresh channel ${channelId.slice(0, 10)}... created`);
+        } else {
+          // Reuse existing channel with balance
+          channelId = existingChannel;
+        }
+      } else {
+        // Create new channel with enough funds for multiple games
+        console.log(`  ⏳ ${player.name}: Creating channel...`);
+        channelId = await createChannelViaRPC(ws, player, SEPOLIA_CONFIG.game.channelDeposit);
+        console.log(`  ✅ ${player.name}: Channel ${channelId.slice(0, 10)}... created`);
+      }
+
+      channelIds.set(player.name, channelId);
+    } catch (error) {
+      console.log(`  ❌ ${player.name}: Failed to get/create channel`);
+      throw error;
+    }
   }
 
-  console.log(`   ✅ All ${channelIds.length} channels ready\n`);
+  console.log(`   ✅ All ${channelIds.size} channels created\n`);
   return channelIds;
 }
 
@@ -188,12 +233,60 @@ async function playGame(
   server: Wallet,
   connections: Map<string, WebSocket>,
   participants: Address[],
-  initialAllocations: Array<{ participant: Address; asset: string; amount: string }>
+  initialAllocations: Array<{ participant: Address; asset: string; amount: string }>,
+  channelIds: Map<string, string>
 ): Promise<{ results: GameResults; sessionId: Hex; gameClients: { server: any; players: any[] } }> {
   console.log('🎲 SETTING UP GAME\n');
 
   const results: GameResults = { wins: new Map() };
   players.forEach(p => results.wins.set(p.name, 0));
+
+  // Check and ensure sufficient balance for each player
+  console.log('  💰 Checking balances...\n');
+  for (const player of players) {
+    const playerWs = connections.get(player.name);
+    if (!playerWs) throw new Error(`Player ${player.name} not connected`);
+
+    const allocation = initialAllocations.find(a => a.participant === player.address);
+    if (!allocation || allocation.amount === '0') continue;
+
+    const channelId = channelIds.get(player.name);
+    if (!channelId) throw new Error(`No channel ID for ${player.name}`);
+
+    await ensureSufficientBalance(
+      playerWs,
+      player,
+      channelId as Hex,
+      allocation.amount,
+      SEPOLIA_CONFIG.game.asset
+    );
+  }
+  console.log('  ✅ All balances sufficient\n');
+
+  // Re-authenticate players with allowances for app session funding
+  console.log('  🔐 Re-authenticating players with allowances...\n');
+  for (const player of players) {
+    const playerWs = connections.get(player.name);
+    if (!playerWs) throw new Error(`Player ${player.name} not connected`);
+
+    // Find this player's allocation amount
+    const allocation = initialAllocations.find(a => a.participant === player.address);
+    if (!allocation || allocation.amount === '0') {
+      console.log(`  ⏭️  ${player.name}: Skipping (no allocation)`);
+      continue;
+    }
+
+    // Re-authenticate with allowances
+    // Convert ETH to WEI for allowances (must be whole number string)
+    const amountWei = parseEther(allocation.amount).toString();
+    await authenticateForAppSession(playerWs, player, [
+      {
+        asset: allocation.asset,
+        amount: amountWei,
+      }
+    ]);
+  }
+  console.log('  ✅ All players authorized\n');
 
   // Create server client
   const serverWs = connections.get(server.name);
@@ -229,9 +322,29 @@ async function playGame(
 
   console.log('  ✅ All game clients ready\n');
 
-  // NOW create the session (clients are listening)
-  console.log('  🎮 Creating game session...\n');
-  const sessionId = await serverClient.createGame(initialAllocations);
+  // NOW create the session with multi-signature (clients are listening)
+  console.log('  🎮 Creating game session with multi-signature...\n');
+
+  // Collect player signers for multi-sig
+  const playerSigners = new Map<Address, MessageSigner>();
+  for (const player of players) {
+    const allocation = initialAllocations.find(a => a.participant === player.address);
+    if (allocation && allocation.amount !== '0') {
+      playerSigners.set(player.address, createMessageSigner(player.client));
+    }
+  }
+
+  // Create session with multi-signature
+  const session = await createGameSessionWithMultiSig(
+    serverWs,
+    serverSigner,
+    playerSigners,
+    participants,
+    initialAllocations,
+    server.address,
+    'NitroRPC/0.4'
+  );
+  const sessionId = session.sessionId;
   console.log(`  ✅ Session created: ${sessionId}\n`);
 
   console.log('🎲 PLAYING TRIVIA GAME\n');
@@ -358,37 +471,42 @@ async function main() {
   players.forEach(p => console.log(`      - ${p.name}: ${p.address}`));
   console.log(`      - ${server.name}: ${server.address}\n`);
 
-  // ==================== CHANNEL CREATION ====================
-  const channelIds = await setupChannels(players, server);
-
   // ==================== CLEARNODE CONNECTION ====================
-  console.log('3. Connecting to ClearNode (off-chain)...\n');
+  console.log('2. Connecting to ClearNode (off-chain)...\n');
 
   const allParticipants = [...players, server];
   const connections = await connectAllParticipants(allParticipants);
 
   console.log(`   ✅ All ${connections.size} participants connected\n`);
 
+  // ==================== CHANNEL CREATION ====================
+  const channelIds = await setupChannelsViaRPC(players, connections);
+
   // ==================== PLAY GAME ====================
-  console.log('4. Setting up game clients and playing...\n');
+  console.log('3. Setting up game clients and playing...\n');
 
   const allParticipantsForSession = [...players, server];
   const initialAllocations: Array<{
     participant: `0x${string}`;
     asset: string;
     amount: string;
-  }> = allParticipantsForSession.map(p => ({
-    participant: p.address,
-    asset: 'eth',
-    amount: '0', // Start with 0 - funds already locked in channels
-  }));
+  }> = allParticipantsForSession.map(p => {
+    // Players deposit entry fee, server starts with 0
+    const isPlayer = players.some(player => player.address === p.address);
+    return {
+      participant: p.address,
+      asset: SEPOLIA_CONFIG.game.asset,
+      amount: isPlayer ? SEPOLIA_CONFIG.game.entryFee : '0',
+    };
+  });
 
   const { results, sessionId, gameClients } = await playGame(
     players,
     server,
     connections,
     allParticipantsForSession.map(p => p.address),
-    initialAllocations
+    initialAllocations,
+    channelIds
   );
 
   // ==================== DISPLAY RESULTS ====================
@@ -398,10 +516,28 @@ async function main() {
   console.log('\n🔒 CLEANUP PHASE\n');
 
   console.log('1. Closing application session...');
-  await gameClients.server.endGame(
-    sessionId,
-    [] // Final allocations would be calculated from prizes
-  );
+
+  // Convert prizes to final allocations for Yellow SDK
+  // IMPORTANT: Must include ALL participants (not just winners) for ClearNode validation
+  const prizeMap = new Map(prizes.map(p => [p.name, p.prize]));
+
+  const finalAllocations = players.map(player => {
+    const prizeAmount = prizeMap.get(player.name);
+    return {
+      participant: player.address,
+      asset: SEPOLIA_CONFIG.game.asset,
+      amount: prizeAmount || '0', // Winners get prize, losers get 0
+    };
+  });
+
+  // Add server allocation (unchanged)
+  finalAllocations.push({
+    participant: server.address,
+    asset: SEPOLIA_CONFIG.game.asset,
+    amount: '0',
+  });
+
+  await gameClients.server.endGame(sessionId, finalAllocations);
   console.log('   ✅ Session closed\n');
 
   console.log('2. Cleaning up game clients...');

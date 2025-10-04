@@ -3,6 +3,7 @@
  *
  * Shows current status of all wallets:
  * - ETH balances (on-chain wallet balance)
+ * - Off-chain ledger balances (ClearNode off-chain tracking)
  * - Custody balances (deposited in custody contract)
  * - Channel information (open channels, balances, participants)
  *
@@ -16,6 +17,8 @@ import { formatEther } from 'viem';
 import { loadWallets, createPublicRpcClient, type Wallet } from './utils/wallets';
 import { NitroliteClient, ChannelStatus } from '@erc7824/nitrolite';
 import { SEPOLIA_CONFIG } from './utils/contracts';
+import { connectToClearNode, authenticateClearNode } from './yellow-integration';
+import { getLedgerBalances } from './utils/clearnode';
 
 /**
  * Format ETH with more decimals for precision
@@ -62,6 +65,57 @@ async function main() {
   }
 
   console.log('└──────────┴────────────────────────────────────────────┴────────────────┘\n');
+
+  // Off-chain ledger balances (from ClearNode)
+  console.log('═══════════════════════════════════════════════════════════════════════════════');
+  console.log('                         OFF-CHAIN LEDGER BALANCES                             ');
+  console.log('                   (Updated by ClearNode Application Sessions)                 ');
+  console.log('═══════════════════════════════════════════════════════════════════════════════\n');
+
+  // Connect to ClearNode to get ledger balances
+  const connections = new Map<string, WebSocket>();
+  try {
+    for (const wallet of walletsToShow) {
+      const ws = await connectToClearNode(SEPOLIA_CONFIG.clearNodeUrl);
+      await authenticateClearNode(ws, wallet);
+      connections.set(wallet.name, ws);
+    }
+
+    // Display ledger balances
+    for (const wallet of walletsToShow) {
+      const ws = connections.get(wallet.name);
+      if (!ws) continue;
+
+      try {
+        const ledgerBalances = await getLedgerBalances(ws, wallet);
+
+        console.log(`┌─ ${wallet.name} (${wallet.address.slice(0, 10)}...${wallet.address.slice(-8)})`);
+
+        if (ledgerBalances && ledgerBalances.length > 0) {
+          ledgerBalances.forEach((balance: any) => {
+            console.log(`│  💎 ${balance.asset.toUpperCase()}: ${balance.amount}`);
+          });
+        } else {
+          console.log(`│  ⚠️  No ledger balances found`);
+        }
+
+        console.log('└─────────────────────────────────────────────────────────────────\n');
+      } catch (error) {
+        console.log(`┌─ ${wallet.name}`);
+        console.log(`│  ⚠️  Error fetching ledger balance: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.log('└─────────────────────────────────────────────────────────────────\n');
+      }
+    }
+  } catch (error) {
+    console.log(`⚠️  Failed to connect to ClearNode: ${error instanceof Error ? error.message : 'Unknown error'}\n`);
+  } finally {
+    // Clean up connections
+    for (const [name, ws] of connections) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    }
+  }
 
   // Channel status for each wallet
   console.log('═══════════════════════════════════════════════════════════════════');

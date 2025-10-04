@@ -40,6 +40,7 @@ import type {
 } from './types';
 import { parseGameMessage } from './types';
 import type { Wallet } from '../utils/wallets';
+import { DEBUG } from '../env';
 
 // ==================== TYPES ====================
 
@@ -85,22 +86,20 @@ export function createPlayerClient({
   function handleIncomingMessage(event: MessageEvent) {
     try {
       const response = parseAnyRPCResponse(event.data);
-      console.log(`  🔍 ${wallet.name}: Received`, response);
 
-      // Handle application messages
+      // Handle application messages from ClearNode
       if (response.method === RPCMethod.Message) {
-        const { message, app_session_id } = response.params;
-        console.log(`  🔍 ${wallet.name}: App message received, session: ${app_session_id?.slice(0, 10)}...`);
+        const { message, app_session_id } = response.params as { message: unknown, app_session_id: Hex };
+        // Skip empty success responses (no message content)
+        if (!message || !app_session_id) {
+          return;
+        }
 
         // Store session ID
         if (app_session_id) {
           currentSessionId = app_session_id;
         }
-
-        // Parse and validate game message with Zod
-        const rawMsg = typeof message === 'string' ? JSON.parse(message) : message;
-        console.log(`  🔍 ${wallet.name}: Raw message type: ${rawMsg.type}`);
-        const gameMsg = parseGameMessage(rawMsg);
+        const gameMsg = parseGameMessage(message);
 
         // Route by message type (TypeScript knows the exact type per case)
         switch (gameMsg.type) {
@@ -171,10 +170,8 @@ export function createPlayerClient({
 
   async function start(): Promise<void> {
     console.log(`  🎮 ${wallet.name}: Starting...`);
-    console.log(`  🔍 ${wallet.name}: WebSocket state: ${ws.readyState}`);
     messageHandler = handleIncomingMessage;
     ws.addEventListener('message', messageHandler);
-    console.log(`  🔍 ${wallet.name}: Added listener, total listeners: ${(ws as any).listenerCount?.('message') || 'unknown'}`);
     console.log(`  ✅ ${wallet.name}: Ready`);
   }
 

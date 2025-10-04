@@ -17,16 +17,21 @@ import {
   createAppSessionMessage,
   createApplicationMessage,
   createCloseAppSessionMessage,
+  createTransferMessage,
   RPCMethod,
   type PartialEIP712AuthMessage,
   type EIP712AuthDomain,
 } from "@erc7824/nitrolite";
+import { NitroliteRPC } from "@erc7824/nitrolite/dist/rpc/nitrolite";
 import {
   type Address,
   type WalletClient,
   type Hex,
+  toHex,
+  keccak256,
 } from "viem";
-import { generateSessionKeypair } from "./utils/keyManager";
+import { DEBUG } from "./env";
+import type { Wallet } from "./utils/wallets";
 
 // ==================== TYPES ====================
 
@@ -84,13 +89,21 @@ export async function connectToClearNode(
 
 /**
  * Authenticate with ClearNode using EIP-712 typed signatures
+ *
+ * Uses the wallet's pre-generated session key for authentication.
+ * This session key will be used for signing states and messages throughout the session.
+ *
+ * @param allowances - Optional allowances for app session funding. When provided,
+ *                     authorizes ClearNode to use these amounts from ledger balances
+ *                     for creating/updating application sessions.
  */
 export async function authenticateClearNode(
   ws: WebSocket,
-  wallet: WalletClient
+  wallet: Wallet,
+  allowances: Array<{ asset: string; amount: string }> = []
 ): Promise<void> {
   return new Promise(async (resolve, reject) => {
-    const account = wallet.account;
+    const account = wallet.client.account;
     if (!account) {
       reject(new Error("No account found in wallet"));
       return;
@@ -100,57 +113,56 @@ export async function authenticateClearNode(
       const walletAddress = account.address;
       const expireNum = Math.floor(Date.now() / 1000) + 3600;
       const expire = expireNum.toString(); // STRING for auth request (server expects string)
-      // Generate ephemeral session keypair (separate from main wallet)
-      const sessionKeypair = generateSessionKeypair();
-      console.log(`  🔑 Main wallet: ${walletAddress}`);
-      console.log(`  🔐 Session key: ${sessionKeypair.address}`);
+
+      if (DEBUG) {
+        console.log(`  🔑 Main wallet: ${walletAddress}`);
+        console.log(`  🔐 Session key: ${wallet.sessionAddress}`);
+      }
 
       // Step 1: Send auth request with main wallet and session key
       const authRequest = await createAuthRequestMessage({
-        address: walletAddress,             // Main wallet address
-        session_key: sessionKeypair.address, // Session wallet address (different!)
+        address: walletAddress,                // Main wallet address
+        session_key: wallet.sessionAddress,    // Session wallet address (from wallet)
         app_name: "Test Domain",
         expire, // Pass as string
         scope: "console",
         application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
-        allowances: [],
+        allowances,                            // Pass allowances (default: [])
       });
 
-      console.log(`  📤 Sending auth request:`, authRequest);
+      if (DEBUG) {
+        console.log(`  📤 Sending auth request:`, authRequest);
+      }
       ws.send(authRequest);
-      console.log(`  📤 Sent auth request for ${walletAddress}`);
 
       // Step 2: Wait for challenge and authenticate
       const handleMessage = async (event: MessageEvent) => {
         try {
           // Parse response using SDK parser for type safety
           const response = parseAnyRPCResponse(event.data);
-          console.log(`  📨 Received ${response.method}:`, response.params);
+
+          if (DEBUG) {
+            console.log(`  📨 Received ${response.method}:`, response.params);
+          }
 
           switch (response.method) {
             case RPCMethod.AuthChallenge:
-              console.log(`  📥 Received auth challenge: ${response.params.challengeMessage}`);
-
               // Create partial EIP-712 message (SDK will add challenge and wallet)
               // Note: expire as STRING matches official SDK tests
               const partialMessage = {
                 scope: "console",
                 application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
-                participant: sessionKeypair.address, // Session wallet address (not main!)
+                participant: wallet.sessionAddress, // Session wallet address (not main!)
                 expire, // STRING (matches official SDK integration tests)
-                allowances: [],
+                allowances,                         // Pass allowances (default: [])
               } satisfies PartialEIP712AuthMessage;
-
-              console.log(`  🔐 Creating EIP-712 signer...`);
 
               // Create EIP-712 message signer (SDK handles signing)
               const signer = createEIP712AuthMessageSigner(
-                wallet,
+                wallet.client,
                 partialMessage,
                 AUTH_DOMAIN
               );
-
-              console.log(`  ✍️  Signing auth verification...`);
 
               // Send auth verification with full challenge response object
               const authVerify = await createAuthVerifyMessage(
@@ -158,9 +170,10 @@ export async function authenticateClearNode(
                 response, // Full challenge response object
               );
 
-              console.log(`  📤 Sending auth verify message:`, authVerify);
+              if (DEBUG) {
+                console.log(`  📤 Sending auth verify message:`, authVerify);
+              }
               ws.send(authVerify);
-              console.log(`  📤 Sent auth verification`);
               break;
 
             case RPCMethod.AuthVerify:
@@ -168,8 +181,8 @@ export async function authenticateClearNode(
                 ws.removeEventListener("message", handleMessage);
                 console.log(`  ✅ Authentication successful`);
 
-                // Store JWT if provided
-                if (response.params.jwtToken) {
+                // Store JWT if provided (debug only)
+                if (DEBUG && response.params.jwtToken) {
                   console.log(`  🎟️  Received JWT token`);
                   // TODO: Store JWT for future sessions
                 }
@@ -292,7 +305,140 @@ export async function createGameSession(
 }
 
 /**
- * Send a game message via ClearNode
+ * Create game session with multiple signatures (multi-party allocations)
+ *
+ * When creating an app session where multiple participants have non-zero allocations,
+ * each participant with an allocation must sign the create_app_session request.
+ *
+ * This function:
+ * 1. Creates the unsigned request message
+ * 2. Collects signatures from server + all players with allocations
+ * 3. Combines signatures into message.sig array
+ * 4. Sends multi-signed message to ClearNode
+ */
+export async function createGameSessionWithMultiSig(
+  ws: WebSocket,
+  serverSigner: MessageSigner,
+  playerSigners: Map<Address, MessageSigner>,
+  participants: Address[],
+  initialAllocations: Array<{
+    participant: Address;
+    asset: string;
+    amount: string;
+  }>,
+  serverAddress: Address,
+  protocol: string = 'NitroRPC/0.4'
+): Promise<AppSessionInfo> {
+  return new Promise(async (resolve, reject) => {
+    console.log("\n  🎮 Creating game session with multi-sig...");
+
+    try {
+      // Game Master pattern: players have weight 0, server has weight 100
+      const weights = participants.map(p =>
+        p.toLowerCase() === serverAddress.toLowerCase() ? 100 : 0
+      );
+
+      // Create unsigned request
+      const request = NitroliteRPC.createRequest({
+        method: RPCMethod.CreateAppSession,
+        params: {
+          definition: {
+            protocol,
+            participants,
+            weights,
+            quorum: 100,
+            challenge: 0,
+            nonce: Date.now(),
+          },
+          allocations: initialAllocations,
+        },
+        signatures: [], // Start with empty signatures
+      });
+
+      // Get the payload to sign
+      if (!request.req) {
+        reject(new Error("Failed to create request message"));
+        return;
+      }
+      const payload = request.req;
+
+      // Collect signatures from all participants with allocations
+      const signatures: Hex[] = [];
+
+      // Always include server signature first
+      console.log("  🔏 Collecting server signature...");
+      const serverSig = await serverSigner(payload);
+      signatures.push(serverSig);
+
+      // Collect player signatures for those with allocations
+      for (const allocation of initialAllocations) {
+        if (allocation.amount !== '0') {
+          const playerSigner = playerSigners.get(allocation.participant);
+          if (!playerSigner) {
+            reject(new Error(`No signer found for participant ${allocation.participant}`));
+            return;
+          }
+          console.log(`  🔏 Collecting signature from ${allocation.participant.slice(0, 10)}...`);
+          const playerSig = await playerSigner(payload);
+          signatures.push(playerSig);
+        }
+      }
+
+      // Attach all signatures to message
+      request.sig = signatures;
+      console.log(`  ✅ Collected ${signatures.length} signatures`);
+
+      // Send multi-signed message
+      ws.send(JSON.stringify(request));
+      console.log("  📤 Sent multi-signed session creation request");
+
+      // Wait for response
+      const handleMessage = (event: MessageEvent) => {
+        try {
+          const response = parseAnyRPCResponse(event.data);
+
+          switch (response.method) {
+            case RPCMethod.CreateAppSession:
+              ws.removeEventListener("message", handleMessage);
+
+              const sessionId = response.params.appSessionId;
+              console.log(`  ✅ Session created: ${sessionId}`);
+
+              resolve({
+                sessionId,
+                status: "open",
+              });
+              break;
+
+            case RPCMethod.Error:
+              console.error("  ❌ ClearNode error:", response.params);
+              ws.removeEventListener("message", handleMessage);
+              reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
+              break;
+          }
+        } catch (error) {
+          console.error("  ❌ Error parsing session response:", error);
+        }
+      };
+
+      ws.addEventListener("message", handleMessage);
+
+      // Timeout
+      setTimeout(() => {
+        ws.removeEventListener("message", handleMessage);
+        reject(new Error("Session creation timeout"));
+      }, 30000);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Send a game message via Yellow SDK's createApplicationMessage
+ *
+ * Uses method="message" with sid (session ID) for ClearNode routing.
+ * ClearNode will broadcast to all session participants.
  */
 export async function sendGameMessage(
   ws: WebSocket,
@@ -300,8 +446,13 @@ export async function sendGameMessage(
   sessionId: Hex,
   messageData: any
 ): Promise<void> {
-  const message = await createApplicationMessage(signer, sessionId, messageData);
-  ws.send(message);
+  const appMessage = await createApplicationMessage(
+    signer,
+    sessionId,
+    messageData
+  );
+
+  ws.send(appMessage);
 }
 
 /**
@@ -317,29 +468,77 @@ export async function closeGameSession(
     amount: string;
   }>
 ): Promise<void> {
-  console.log("\n  🔒 Closing game session...");
+  return new Promise(async (resolve, reject) => {
+    try {
+      console.log("\n  🔒 Closing game session...");
 
-  const closeMsg = await createCloseAppSessionMessage(signer, {
-    app_session_id: sessionId,
-    allocations: finalAllocations,
+      const closeMsg = await createCloseAppSessionMessage(signer, {
+        app_session_id: sessionId,
+        allocations: finalAllocations,
+      });
+
+      // Setup listener for response
+      const handleMessage = (event: MessageEvent) => {
+        try {
+          const response = parseAnyRPCResponse(event.data);
+          if (response.method === RPCMethod.CloseAppSession) {
+            console.log("  ✅ Session closed");
+            ws.removeEventListener("message", handleMessage);
+            resolve();
+          }
+          if (response.method === RPCMethod.Error) {
+            console.error("  ❌ ClearNode error:", response.params);
+            ws.removeEventListener("message", handleMessage);
+            reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
+          }
+        } catch (error) {
+          // Ignore parsing errors, might be other messages
+        }
+      };
+
+      // Set up timeout
+      const timeoutId = setTimeout(() => {
+        ws.removeEventListener("message", handleMessage);
+        reject(new Error("Timeout closing session"));
+      }, 10000);
+
+      ws.addEventListener("message", handleMessage);
+      ws.send(closeMsg);
+      console.log("  ✅ Session close request sent");
+    } catch (error) {
+      reject(error);
+    }
   });
-
-  ws.send(closeMsg);
-  console.log("  ✅ Session close request sent");
 }
 
 // ==================== UTILITIES ====================
 
 /**
  * Create a message signer from a wallet
+ *
+ * This creates an ECDSA signer for general RPC methods (create_channel, etc.).
+ * Pattern matches SDK's createECDSAMessageSigner but uses WalletClient instead of raw private key.
+ *
+ * Note: Auth messages use createEIP712AuthMessageSigner, other RPC methods use raw ECDSA.
  */
 export function createMessageSigner(wallet: WalletClient): MessageSigner {
-  return async (message: any) => {
+  return async (payload: any) => {
     if (!wallet.account) throw new Error("No account in wallet");
 
-    return await wallet.signMessage({
-      message: typeof message === "string" ? message : JSON.stringify(message),
-      account: wallet.account,
-    });
+    // Match SDK's ECDSA signer pattern:
+    // 1. JSON.stringify with BigInt handling
+    // 2. Convert to hex
+    // 3. Hash with keccak256
+    // 4. Sign the hash directly (NOT signMessage which adds prefix)
+    const message = toHex(
+      JSON.stringify(payload, (_, v) =>
+        typeof v === 'bigint' ? v.toString() : v
+      )
+    );
+
+    const hash = keccak256(message);
+    const signature = await wallet.account.sign?.({ hash });
+
+    return signature;
   };
 }

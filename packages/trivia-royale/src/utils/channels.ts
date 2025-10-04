@@ -1,10 +1,15 @@
 import { NitroliteClient, WalletStateSigner, getChannelId } from '@erc7824/nitrolite';
+import { SessionKeyStateSigner } from '@erc7824/nitrolite/dist/client/signer';
 import { parseEther } from 'viem';
 import { SEPOLIA_CONFIG } from './contracts';
 import { createPublicRpcClient, type Wallet } from './wallets';
 
 /**
  * Create NitroliteClient for a wallet
+ *
+ * Uses SessionKeyStateSigner to sign states with the wallet's session key.
+ * This matches ClearNode's expectation that states are signed by the session key
+ * address provided during authentication and channel creation.
  */
 export function createNitroliteClient(
   playerWallet: Wallet,
@@ -12,7 +17,9 @@ export function createNitroliteClient(
 ): NitroliteClient {
   const publicClient = createPublicRpcClient();
 
-  const stateSigner = new WalletStateSigner(playerWallet.client);
+  // Use session key for state signing (matches SDK integration tests pattern)
+  const stateSigner = new SessionKeyStateSigner(playerWallet.sessionPrivateKey);
+
   return new NitroliteClient({
     publicClient,
     walletClient: playerWallet.client,

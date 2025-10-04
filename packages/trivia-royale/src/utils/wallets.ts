@@ -3,6 +3,7 @@ import type { Account, WalletClient, Chain, Transport, ParseAccount } from 'viem
 import { createWalletClient, createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
 import { env } from '../env';
+import { generateSessionKeypair } from './keyManager';
 
 const WALLET_NAMES = [
   'Master',    // index 0 - Funding source
@@ -20,6 +21,9 @@ export interface Wallet {
   account: Account;
   client: WalletClient<Transport, Chain, ParseAccount<Account>>;
   address: `0x${string}`;
+  // Session keypair for ClearNode operations (signing states, RPC messages)
+  sessionPrivateKey: `0x${string}`;
+  sessionAddress: `0x${string}`;
 }
 
 /**
@@ -55,12 +59,17 @@ export function loadWallets(): Wallets {
       transport: http(),
     });
 
+    // Generate ephemeral session keypair for ClearNode operations
+    const sessionKeypair = generateSessionKeypair();
+
     return {
       name,
       index,
       account,
       client,
       address: account.address,
+      sessionPrivateKey: sessionKeypair.privateKey,
+      sessionAddress: sessionKeypair.address,
     };
   });
 

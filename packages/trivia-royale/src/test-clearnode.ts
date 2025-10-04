@@ -27,7 +27,7 @@ async function main() {
 
     // Step 2: Authenticate
     console.log('2. Authenticating with wallet signature...');
-    await authenticateClearNode(ws, alice.client);
+    await authenticateClearNode(ws, alice);
     console.log('   ✅ Authentication successful\n');
 
     // Success!

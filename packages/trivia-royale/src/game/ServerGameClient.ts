@@ -38,6 +38,7 @@ import type {
   RoundWinner,
 } from './types';
 import { parseGameMessage } from './types';
+import { DEBUG } from '../env';
 
 // ==================== TYPES ====================
 
@@ -87,22 +88,33 @@ export function createServerClient({
   function handleIncomingMessage(event: MessageEvent) {
     try {
       const response = parseAnyRPCResponse(event.data);
-      console.log(`  🔍 Server: Received method: ${response.method}`);
 
-      // Handle errors from ClearNode
+      // Handle RPC errors from ClearNode
       if (response.method === RPCMethod.Error) {
         console.error(`  ❌ Server: ClearNode Error:`, JSON.stringify(response.params, null, 2));
         return;
       }
 
-      // Handle application messages
+      // Handle application messages from ClearNode (broadcast from other participants)
       if (response.method === RPCMethod.Message) {
-        const { message } = response.params;
-        console.log(`  🔍 Server: App message received`);
+        const { message, app_session_id } = response.params;
+
+        // Skip empty success responses (no message content)
+        if (!message || !app_session_id) {
+          if (DEBUG) {
+            console.log(`  🔍 Server: Empty message received`);
+          }
+          return;
+        }
 
         // Parse and validate game message with Zod
         const rawMsg = typeof message === 'string' ? JSON.parse(message) : message;
-        console.log(`  🔍 Server: Raw message type: ${rawMsg.type}`);
+
+        if (DEBUG) {
+          console.log(`  🔍 Server: App message received, session: ${app_session_id?.slice(0, 10)}...`);
+          console.log(`  🔍 Server: Raw message type: ${rawMsg.type}`);
+        }
+
         const gameMsg = parseGameMessage(rawMsg);
 
         // Route by message type (TypeScript knows the exact type per case)
