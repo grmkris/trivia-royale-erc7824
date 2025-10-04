@@ -48,6 +48,28 @@ async function sendUSDC(
 }
 
 /**
+ * Filter wallets by names (case-insensitive)
+ */
+function filterWalletsByNames(
+  wallets: Wallet[],
+  names: string[]
+): { matched: Wallet[]; invalid: string[] } {
+  const matched: Wallet[] = [];
+  const invalid: string[] = [];
+
+  for (const name of names) {
+    const wallet = wallets.find(w => w.name.toLowerCase() === name.toLowerCase());
+    if (wallet) {
+      matched.push(wallet);
+    } else {
+      invalid.push(name);
+    }
+  }
+
+  return { matched, invalid };
+}
+
+/**
  * Main distribution function - dual currency
  */
 async function distributeFunds(
@@ -83,6 +105,16 @@ async function main() {
   const broker = wallets.broker;
   const players = wallets.players;
   const server = wallets.server;
+  const test = wallets.test;
+  const test2 = wallets.test2;
+  const test3 = wallets.test3;
+  const test4 = wallets.test4;
+  const test5 = wallets.test5;
+  const test6 = wallets.test6;
+  const test7 = wallets.test7;
+  const test8 = wallets.test8;
+  const test9 = wallets.test9;
+  const test10 = wallets.test10;
   const publicClient = createPublicRpcClient();
 
   // Check funding wallet balances
@@ -94,13 +126,40 @@ async function main() {
   console.log(`   ETH Balance:  ${formatEther(fundingEthBalance)}`);
   console.log(`   USDC Balance: ${formatUSDC(fundingUsdcBalance)}\n`);
 
-  // Calculate required amounts
-  // Gas recipients: Broker + Server + 5 Players = 7 wallets
-  const gasRecipients = [broker, server, ...players];
-  const requiredEth = parseEther(SEPOLIA_CONFIG.funding.gasAmount) * BigInt(gasRecipients.length);
+  // Parse command-line arguments for selective funding
+  const walletNames = process.argv.slice(2);
 
-  // Game recipients: Server + 5 Players = 6 wallets (Broker doesn't need USDC)
-  const gameRecipients = [server, ...players];
+  // All possible recipients (before filtering)
+  // Gas recipients: Broker + Server + 5 Players + Test + Test2 + Test3 + Test4 + Test5 + Test6 + Test7 + Test8 + Test9 + Test10 = 17 wallets
+  let gasRecipients = [broker, server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10];
+
+  // Game recipients: Server + 5 Players + Test + Test2 + Test3 + Test4 + Test5 + Test6 + Test7 + Test8 + Test9 + Test10 = 16 wallets (Broker doesn't need USDC)
+  let gameRecipients = [server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10];
+
+  // Apply filter if wallet names provided
+  if (walletNames.length > 0) {
+    const allPossibleRecipients = [...gasRecipients];
+    const { matched, invalid } = filterWalletsByNames(allPossibleRecipients, walletNames);
+
+    if (invalid.length > 0) {
+      console.log(`❌ Invalid wallet name(s): ${invalid.join(', ')}\n`);
+      console.log('Available wallets:');
+      console.log(`   ${allPossibleRecipients.map(w => w.name).join(', ')}\n`);
+      return;
+    }
+
+    gasRecipients = matched;
+    // Game recipients exclude Broker even if specified
+    gameRecipients = matched.filter(w => w.name !== 'Broker');
+
+    console.log(`📋 Funding ${matched.length} selected wallet(s):`);
+    console.log(`   ${matched.map(w => w.name).join(', ')}\n`);
+  } else {
+    console.log(`📋 Funding all ${gasRecipients.length} wallets\n`);
+  }
+
+  // Calculate required amounts
+  const requiredEth = parseEther(SEPOLIA_CONFIG.funding.gasAmount) * BigInt(gasRecipients.length);
   const requiredUsdc = parseUSDC(SEPOLIA_CONFIG.funding.gameAmount) * BigInt(gameRecipients.length);
 
   // Check if funding wallet has enough

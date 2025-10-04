@@ -10,7 +10,7 @@ export const SEPOLIA_CONFIG = {
     // ClearNode broker address (Broker wallet - index 1)
     // This address must match the BROKER_PRIVATE_KEY in docker-compose.yml
     // Derived from mnemonic index 1
-    brokerAddress: '0x71DB80a0eaB6Ef826B95acB29a5E8E86e9a95cF9' as const, // UPDATE THIS after deriving from index 1
+    brokerAddress: '0xa5819442D1A69337ca93b688994Ae27E8C58D019' as const, // UPDATE THIS after deriving from index 1
   },
 
   token: {
@@ -20,11 +20,11 @@ export const SEPOLIA_CONFIG = {
 
   funding: {
     // Funding wallet reserves (received from faucets)
-    fundingGasReserve: '1',      // 1 ETH for Funding wallet
+    fundingGasReserve: '0.01',   // 0.01 ETH for Funding wallet (7 wallets × 0.001 + buffer)
     fundingGameReserve: '200',   // 200 USDC for Funding wallet
 
     // Distribution amounts per wallet
-    gasAmount: '0.1',            // ETH for gas (to Broker, Server, Players)
+    gasAmount: '0.001',          // ETH for gas (to Broker, Server, Players) - enough for 100+ games
     gameAmount: '20',            // USDC for game (to Server and Players only)
   },
 

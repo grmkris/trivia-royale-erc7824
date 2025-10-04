@@ -13,45 +13,15 @@ import {
 } from "@erc7824/nitrolite";
 import type { WalletClient, Hex, Chain, Transport, Account, ParseAccount } from "viem";
 import { NITROLITE_CONFIG } from "../nitrolite-config";
+import { generateSessionKeypair, type SessionKeypair } from "../utils/sessionKeys";
 
 // ==================== TYPES ====================
-
-export interface SessionKeypair {
-	privateKey: Hex;
-	address: Hex;
-}
 
 export interface AuthResult {
 	success: boolean;
 	jwtToken?: string;
 	sessionKey?: Hex;
-}
-
-// ==================== SESSION KEYPAIR (Browser) ====================
-
-/**
- * Generate ephemeral session keypair using Web Crypto API
- * Browser-compatible (no Node crypto dependency)
- */
-function generateSessionKeypair(): SessionKeypair {
-	// Generate 32 random bytes
-	const array = new Uint8Array(32);
-	crypto.getRandomValues(array);
-
-	// Convert to hex string
-	const privateKey = `0x${Array.from(array)
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("")}` as Hex;
-
-	// Derive address from private key (simplified - in production use viem)
-	// For now, generate another random address (session key doesn't need to match)
-	const addressArray = new Uint8Array(20);
-	crypto.getRandomValues(addressArray);
-	const address = `0x${Array.from(addressArray)
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("")}` as Hex;
-
-	return { privateKey, address };
+	sessionPrivateKey?: Hex;
 }
 
 // ==================== WEBSOCKET CONNECTION ====================
@@ -169,6 +139,7 @@ export async function authenticateClearNode(
 									success: true,
 									jwtToken: response.params.jwtToken,
 									sessionKey: sessionKeypair.address,
+									sessionPrivateKey: sessionKeypair.privateKey,
 								});
 							} else {
 								reject(new Error("Authentication failed"));

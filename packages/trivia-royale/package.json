@@ -10,6 +10,8 @@
     "status": "bun run src/status.ts",
     "test-clearnode": "bun run src/test-clearnode.ts",
     "play": "bun run src/play.ts",
+    "cashout": "bun run src/cashout.ts",
+    "e2e-flow": "bun run src/e2e-flow.ts",
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {

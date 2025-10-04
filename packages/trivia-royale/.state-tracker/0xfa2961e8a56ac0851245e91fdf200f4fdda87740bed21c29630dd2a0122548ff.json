@@ -1,0 +1,23 @@
+[
+  {
+    "intent": 1,
+    "version": "0",
+    "data": "0x",
+    "allocations": [
+      {
+        "destination": "0xD7DFdEDFdF8EbC3bF38DeE0bb0538B60BeeDbc8c",
+        "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        "amount": "10000000"
+      },
+      {
+        "destination": "0xa5819442D1A69337ca93b688994Ae27E8C58D019",
+        "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        "amount": "0"
+      }
+    ],
+    "sigs": [
+      "0xc20304d8978522da526c8459ac807f929b87c4ea58dbe54af7024617480b95b770878cf67fd60416f8e43da7cf7526fc9992a7085b49b75f21c4c1164aaa83911c",
+      "0xf8c441a3b88401c32cdaa60dac1be92a6125888ba2e6a947da842a5bbe9f7566462de185f1f8d3ebbf02b01097cd42856536b3c2ca91934ea517014b1cef28521b"
+    ]
+  }
+]

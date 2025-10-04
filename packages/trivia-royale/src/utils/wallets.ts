@@ -14,6 +14,16 @@ const WALLET_NAMES = [
   'Charlie',   // index 5 - Player
   'Diana',     // index 6 - Player
   'Eve',       // index 7 - Player
+  'Test',      // index 8 - Test wallet (clean slate for e2e tests)
+  'Test2',     // index 9 - Test2 wallet (clean slate for e2e tests)
+  'Test3',     // index 10 - Test3 wallet (clean slate for e2e tests)
+  'Test4',     // index 11 - Test4 wallet (clean slate for e2e tests)
+  'Test5',     // index 12 - Test5 wallet (clean slate for e2e tests)
+  'Test6',     // index 13 - Test6 wallet (clean slate for e2e tests)
+  'Test7',     // index 14 - Test7 wallet (clean slate for e2e tests)
+  'Test8',     // index 15 - Test8 wallet (clean slate for e2e tests)
+  'Test9',     // index 16 - Test9 wallet (clean slate for e2e tests)
+  'Test10',    // index 17 - Test10 wallet (clean slate for e2e tests)
 ] as const;
 
 export interface Wallet {
@@ -39,6 +49,16 @@ export interface Wallets {
   charlie: Wallet;
   diana: Wallet;
   eve: Wallet;
+  test: Wallet;
+  test2: Wallet;
+  test3: Wallet;
+  test4: Wallet;
+  test5: Wallet;
+  test6: Wallet;
+  test7: Wallet;
+  test8: Wallet;
+  test9: Wallet;
+  test10: Wallet;
   all: Wallet[];
   players: Wallet[];
 }
@@ -85,6 +105,16 @@ export function loadWallets(): Wallets {
     charlie: walletArray[5]!,
     diana: walletArray[6]!,
     eve: walletArray[7]!,
+    test: walletArray[8]!,
+    test2: walletArray[9]!,
+    test3: walletArray[10]!,
+    test4: walletArray[11]!,
+    test5: walletArray[12]!,
+    test6: walletArray[13]!,
+    test7: walletArray[14]!,
+    test8: walletArray[15]!,
+    test9: walletArray[16]!,
+    test10: walletArray[17]!,
     all: walletArray,
     players: [walletArray[3]!, walletArray[4]!, walletArray[5]!, walletArray[6]!, walletArray[7]!],
   };

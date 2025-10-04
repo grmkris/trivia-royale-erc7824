@@ -30,6 +30,7 @@ function formatUsdcBalance(wei: bigint): string {
 
 async function main() {
   console.log('\n🎮 TRIVIA ROYALE - Status Report\n');
+  console.log(`💎 USDC Token: ${SEPOLIA_CONFIG.contracts.tokenAddress}\n`);
 
   const wallets = loadWallets();
   const publicClient = createPublicRpcClient();
@@ -56,6 +57,16 @@ async function main() {
       case 'Funding': return '💰';
       case 'Broker': return '🏦';
       case 'Server': return '🎮';
+      case 'Test': return '🧪';
+      case 'Test2': return '🧬';
+      case 'Test3': return '🔬';
+      case 'Test4': return '⚗️';
+      case 'Test5': return '🧫';
+      case 'Test6': return '🔭';
+      case 'Test7': return '🧮';
+      case 'Test8': return '🔎';
+      case 'Test9': return '🔬';
+      case 'Test10': return '⚛️';
       default: return '👤';
     }
   };

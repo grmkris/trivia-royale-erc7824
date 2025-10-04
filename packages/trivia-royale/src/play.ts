@@ -84,7 +84,6 @@ import {
   disconnectAll,
   createChannelViaRPC,
   getChannelWithBroker,
-  closeChannelViaRPC,
   authenticateForAppSession,
   ensureSufficientBalance,
   getLedgerBalances,
@@ -196,21 +195,9 @@ async function setupChannelsViaRPC(
 
       let channelId: string;
       if (existingChannel) {
-        // Check if existing channel has balance
-        const balances = await getLedgerBalances(ws, player);
-        const balance = balances.find(b => b.asset === SEPOLIA_CONFIG.game.asset);
-
-        if (!balance || BigInt(parseUnits(balance.amount, SEPOLIA_CONFIG.token.decimals)) === 0n) {
-          // Channel exists but is drained - close it and create a fresh one
-          console.log(`  🔄 ${player.name}: Closing drained channel...`);
-          await closeChannelViaRPC(ws, player, existingChannel);
-          console.log(`  ⏳ ${player.name}: Creating fresh channel...`);
-          channelId = await createChannelViaRPC(ws, player, SEPOLIA_CONFIG.game.channelDeposit);
-          console.log(`  ✅ ${player.name}: Fresh channel ${channelId.slice(0, 10)}... created`);
-        } else {
-          // Reuse existing channel with balance
-          channelId = existingChannel;
-        }
+        // Reuse existing channel
+        channelId = existingChannel;
+        console.log(`  ✅ ${player.name}: Reusing channel ${channelId.slice(0, 10)}...`);
       } else {
         // Create new channel with enough funds for multiple games
         console.log(`  ⏳ ${player.name}: Creating channel...`);

@@ -22,6 +22,7 @@ import {
   createGetChannelsMessage,
   createResizeChannelMessage,
   createCloseChannelMessage,
+  createTransferMessage,
   parseAnyRPCResponse,
   parseCreateChannelResponse,
   parseGetChannelsResponse,
@@ -248,24 +249,6 @@ export async function resizeChannelViaRPC(
       const nitroliteClient = createNitroliteClient(wallet, SEPOLIA_CONFIG.contracts.brokerAddress);
       const amountWei = parseUSDC(additionalAmount);
 
-      // Approve custody contract first
-      await ensureAllowance(wallet, SEPOLIA_CONFIG.contracts.custody, amountWei);
-
-      // Deposit funds to custody contract
-      console.log(`  💳 ${wallet.name}: Depositing ${additionalAmount} USDC to custody...`);
-      const depositTxHash = await nitroliteClient.deposit(SEPOLIA_CONFIG.contracts.tokenAddress, amountWei);
-      const depositReceipt = await nitroliteClient.publicClient.waitForTransactionReceipt({ hash: depositTxHash });
-
-      if (depositReceipt.status === 'reverted') {
-        reject(new Error('Deposit transaction reverted'));
-        return;
-      }
-
-      console.log(`  ✅ ${wallet.name}: Deposit confirmed`);
-
-      // Wait a bit for ClearNode to detect the deposit
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
       const sessionSigner = createMessageSigner(createWalletClient({
         account: privateKeyToAccount(wallet.sessionPrivateKey),
         chain: sepolia,
@@ -287,7 +270,6 @@ export async function resizeChannelViaRPC(
                 reject(new Error('Incomplete resize response'));
                 return;
               }
-
               // Submit resize transaction
               const txHash = await nitroliteClient.resizeChannel({
                 resizeState: {
@@ -628,6 +610,76 @@ export async function ensureSufficientBalance(
   } else {
     console.log(`  ✅ ${wallet.name}: Sufficient balance`);
   }
+}
+
+/**
+ * Transfer funds via ClearNode ledger (off-chain)
+ *
+ * Transfers funds between participants' ledger balances off-chain.
+ * This updates ClearNode's internal ledger without touching channels or blockchain.
+ *
+ * @param ws - WebSocket connection of the sender
+ * @param fromWallet - Wallet sending the funds
+ * @param toAddress - Address receiving the funds
+ * @param amount - Amount to transfer (in USDC, e.g., "0.3")
+ * @param asset - Asset identifier (e.g., "usdc")
+ */
+export async function transferViaLedger(
+  ws: WebSocket,
+  fromWallet: Wallet,
+  toAddress: Address,
+  amount: string,
+  asset: string
+): Promise<void> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      console.log(`  💸 ${fromWallet.name}: Transferring ${amount} ${asset.toUpperCase()} to ${toAddress.slice(0, 10)}...`);
+
+      const sessionSigner = createMessageSigner(createWalletClient({
+        account: privateKeyToAccount(fromWallet.sessionPrivateKey),
+        chain: sepolia,
+        transport: http(),
+      }));
+
+      // Create message handler for RPC response
+      const handleMessage = async (event: MessageEvent) => {
+        try {
+          const response = parseAnyRPCResponse(event.data);
+
+          if (response.method === RPCMethod.Transfer) {
+            ws.removeEventListener('message', handleMessage);
+            console.log(`  ✅ ${fromWallet.name}: Transfer complete`);
+            resolve();
+          } else if (response.method === RPCMethod.Error) {
+            console.error(`  ❌ ClearNode error:`, response.params);
+            ws.removeEventListener('message', handleMessage);
+            reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
+          }
+        } catch (error) {
+          // Ignore parsing errors
+        }
+      };
+
+      const timeoutId = setTimeout(() => {
+        ws.removeEventListener('message', handleMessage);
+        reject(new Error('Timeout waiting for transfer response'));
+      }, 30000);
+
+      ws.addEventListener('message', handleMessage);
+
+      // Send transfer request
+      const message = await createTransferMessage(sessionSigner, {
+        destination: toAddress,
+        allocations: [{
+          amount: amount,
+          asset: asset,
+        }],
+      });
+      ws.send(message);
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 /**

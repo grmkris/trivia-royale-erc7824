@@ -22,6 +22,25 @@ import { getUSDCBalance, formatUSDC, parseUSDC } from './utils/erc20';
 
 const WALLET_NAMES = ['Funding', 'Broker', 'Server', 'Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
 
+/**
+ * Get broker private key (index 1) for docker-compose.yml
+ */
+function getBrokerPrivateKey(mnemonic: string): `0x${string}` {
+  const account = mnemonicToAccount(mnemonic, { accountIndex: 1 });
+  const hdKey = account.getHdKey();
+  const privateKeyBytes = hdKey.privateKey;
+
+  // Convert Uint8Array to hex string
+  if (privateKeyBytes instanceof Uint8Array) {
+    const hex = Array.from(privateKeyBytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    return `0x${hex}` as `0x${string}`;
+  }
+
+  return privateKeyBytes as `0x${string}`;
+}
+
 async function main() {
   console.log('\n🎮 TRIVIA ROYALE - Setup\n');
 
@@ -42,13 +61,25 @@ async function main() {
       console.log(`   ${i}. ${WALLET_NAMES[i]?.padEnd(8)}: ${address}`);
     }
 
-    console.log('\n📋 Next Steps:');
+    // Show Broker configuration
+    const brokerPrivateKey = getBrokerPrivateKey(mnemonic);
+    const brokerAddress = deriveAddress(mnemonic, 1);
+
+    console.log('\n🔑 BROKER CONFIGURATION (Index 1 - for ClearNode):\n');
+    console.log(`   Address:     ${brokerAddress}`);
+    console.log(`   Private Key: ${brokerPrivateKey}`);
+    console.log('\n   ⚠️  IMPORTANT: Update docker-compose.yml with this private key:');
+    console.log(`   Line 103: BROKER_PRIVATE_KEY: ${brokerPrivateKey}\n`);
+
+    console.log('📋 Next Steps:');
     console.log('   1. Save MNEMONIC to .env file');
-    console.log('   2. Fund Funding wallet (index 0) with:');
+    console.log('   2. Update BROKER_PRIVATE_KEY in docker-compose.yml (see above)');
+    console.log('   3. Fund Funding wallet (index 0) with:');
     console.log(`      - ${SEPOLIA_CONFIG.funding.fundingGasReserve} ETH from: https://faucets.chain.link/sepolia`);
     console.log(`      - ${SEPOLIA_CONFIG.funding.fundingGameReserve} USDC from: https://faucet.circle.com/`);
-    console.log('   3. Run: bun run fund');
-    console.log('   4. Run: bun run play\n');
+    console.log('   4. Start ClearNode: docker-compose up -d');
+    console.log('   5. Run: bun run fund');
+    console.log('   6. Run: bun run play\n');
 
     return;
   }
@@ -58,7 +89,20 @@ async function main() {
 
   const wallets = loadWallets();
   const funding = wallets.funding;
+  const broker = wallets.broker;
   const publicClient = createPublicRpcClient();
+
+  // Show Broker configuration
+  const brokerPrivateKey = getBrokerPrivateKey(mnemonic);
+  console.log('🔑 Broker Configuration:\n');
+  console.log(`   Address:     ${broker.address}`);
+  console.log(`   Private Key: ${brokerPrivateKey}`);
+  console.log(`   Expected:    ${SEPOLIA_CONFIG.contracts.brokerAddress}`);
+  if (broker.address.toLowerCase() !== SEPOLIA_CONFIG.contracts.brokerAddress.toLowerCase()) {
+    console.log(`   ⚠️  WARNING: Broker address mismatch! Update contracts.ts brokerAddress\n`);
+  } else {
+    console.log(`   ✅ Matches contracts.ts configuration\n`);
+  }
 
   // Check funding wallet balances (both ETH and USDC)
   const ethBalance = await publicClient.getBalance({ address: funding.address });
@@ -94,8 +138,10 @@ async function main() {
   } else {
     console.log('✅ Funding wallet has sufficient funds\n');
     console.log('📋 Next Steps:');
-    console.log('   1. Run: bun run fund');
-    console.log('   2. Run: bun run play\n');
+    console.log('   1. Verify BROKER_PRIVATE_KEY in docker-compose.yml (see above)');
+    console.log('   2. Start ClearNode: docker-compose up -d');
+    console.log('   3. Run: bun run fund');
+    console.log('   4. Run: bun run play\n');
   }
 }
 

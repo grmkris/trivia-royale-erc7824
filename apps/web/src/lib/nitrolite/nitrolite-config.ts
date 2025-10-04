@@ -13,7 +13,14 @@ export const NITROLITE_CONFIG = {
 	contracts: {
 		custody: "0x019B65A265EB3363822f2752141b3dF16131b262" as const,
 		adjudicator: "0x7c7ccbc98469190849BCC6c926307794fDfB11F2" as const,
-		tokenAddress: "0x0000000000000000000000000000000000000000" as const,
+		tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as const, // USDC on Sepolia
+		brokerAddress: "0xa5819442D1A69337ca93b688994Ae27E8C58D019" as const, // Broker address
+	},
+
+	// Token configuration
+	token: {
+		symbol: "USDC",
+		decimals: 6,
 	},
 
 	// Auth domain (must match app_name)
@@ -25,7 +32,7 @@ export const NITROLITE_CONFIG = {
 	auth: {
 		appName: "Test Domain",
 		scope: "console",
-		application: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc" as const,
+		application: "0xA7985cb537FC788283b5bEE56178CB5be95103eF" as const,
 		expireSeconds: 3600, // 1 hour
 	},
 } as const;

@@ -100,7 +100,7 @@ services:
       # Broker signing key (Broker wallet - index 1 from mnemonic)
       # IMPORTANT: This must be derived from mnemonic index 1, NOT index 0
       # The Funding wallet (index 0) is separate and only used for distribution
-      BROKER_PRIVATE_KEY: ${BROKER_PRIVATE_KEY:-0x0af8bef0c6b3d7b0058d201b0b61deafa633442d1052e8c2fdc050a382f847ff}
+      BROKER_PRIVATE_KEY: ${BROKER_PRIVATE_KEY:-0x718758aaed9cd315e6140859867422e8df4ea4143d989769edb4be2eee23aea0}
 
       # Ethereum Sepolia Network Configuration (Chain ID: 11155111)
       ETHEREUM_SEPOLIA_CUSTODY_CONTRACT_ADDRESS: ${ETHEREUM_SEPOLIA_CUSTODY_CONTRACT_ADDRESS:-0x019B65A265EB3363822f2752141b3dF16131b262}

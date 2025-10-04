@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useWalletClient } from "wagmi";
 import type { Hex } from "viem";
 import { connectToClearNode, authenticateClearNode } from "@/lib/nitrolite/actions/authenticateClearNode";
+import { createNitroliteClient, type NitroliteClient } from "@/lib/nitrolite/createNitroliteClient";
 
 export type AuthStatus =
 	| "idle"
@@ -17,9 +18,7 @@ export type AuthStatus =
 export interface UseNitroliteAuthResult {
 	status: AuthStatus;
 	error: string | null;
-	jwtToken: string | null;
-	sessionKey: Hex | null;
-	ws: WebSocket | null;
+	client: NitroliteClient | null;
 	connectAndAuthenticate: () => void;
 	disconnect: () => void;
 }
@@ -87,6 +86,15 @@ export function useNitroliteAuth(): UseNitroliteAuthResult {
 		mutation.reset();
 	};
 
+	// Create client instance when authenticated
+	const client =
+		mutation.isSuccess &&
+		ws &&
+		walletClient.data &&
+		mutation.data?.sessionPrivateKey
+			? createNitroliteClient(ws, walletClient.data, mutation.data.sessionPrivateKey)
+			: null;
+
 	return {
 		status,
 		error:
@@ -95,9 +103,7 @@ export function useNitroliteAuth(): UseNitroliteAuthResult {
 				: mutation.error
 					? String(mutation.error)
 					: null,
-		jwtToken: mutation.data?.jwtToken ?? null,
-		sessionKey: mutation.data?.sessionKey ?? null,
-		ws,
+		client,
 		connectAndAuthenticate: () => mutation.mutate(),
 		disconnect,
 	};
