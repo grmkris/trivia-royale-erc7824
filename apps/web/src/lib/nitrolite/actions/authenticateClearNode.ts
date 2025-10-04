@@ -11,8 +11,8 @@ import {
 	RPCMethod,
 	type PartialEIP712AuthMessage,
 } from "@erc7824/nitrolite";
-import type { WalletClient, Hex } from "viem";
-import { NITROLITE_CONFIG } from "./nitrolite-config";
+import type { WalletClient, Hex, Chain, Transport, Account, ParseAccount } from "viem";
+import { NITROLITE_CONFIG } from "../nitrolite-config";
 
 // ==================== TYPES ====================
 
@@ -33,7 +33,7 @@ export interface AuthResult {
  * Generate ephemeral session keypair using Web Crypto API
  * Browser-compatible (no Node crypto dependency)
  */
-export function generateSessionKeypair(): SessionKeypair {
+function generateSessionKeypair(): SessionKeypair {
 	// Generate 32 random bytes
 	const array = new Uint8Array(32);
 	crypto.getRandomValues(array);
@@ -84,13 +84,12 @@ export async function connectToClearNode(): Promise<WebSocket> {
 }
 
 // ==================== AUTHENTICATION ====================
-
 /**
  * Authenticate with ClearNode using EIP-712 typed signatures
  */
 export async function authenticateClearNode(
 	ws: WebSocket,
-	wallet: WalletClient,
+	wallet: WalletClient
 ): Promise<AuthResult> {
 	return new Promise(async (resolve, reject) => {
 		const account = wallet.account;

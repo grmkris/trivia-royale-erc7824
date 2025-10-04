@@ -6,13 +6,14 @@ import { env } from '../env';
 import { generateSessionKeypair } from './keyManager';
 
 const WALLET_NAMES = [
-  'Master',    // index 0 - Funding source
-  'Alice',     // index 1
-  'Bob',       // index 2
-  'Charlie',   // index 3
-  'Diana',     // index 4
-  'Eve',       // index 5
-  'Server',    // index 6
+  'Funding',   // index 0 - Funding source (receives from faucets, distributes to all)
+  'Broker',    // index 1 - ClearNode broker (state channel counterparty)
+  'Server',    // index 2 - Game server (controls game flow)
+  'Alice',     // index 3 - Player
+  'Bob',       // index 4 - Player
+  'Charlie',   // index 5 - Player
+  'Diana',     // index 6 - Player
+  'Eve',       // index 7 - Player
 ] as const;
 
 export interface Wallet {
@@ -30,13 +31,14 @@ export interface Wallet {
  * Wallets object with named properties for type safety and autocomplete
  */
 export interface Wallets {
-  master: Wallet;
+  funding: Wallet;
+  broker: Wallet;
+  server: Wallet;
   alice: Wallet;
   bob: Wallet;
   charlie: Wallet;
   diana: Wallet;
   eve: Wallet;
-  server: Wallet;
   all: Wallet[];
   players: Wallet[];
 }
@@ -75,15 +77,16 @@ export function loadWallets(): Wallets {
 
   // Create object with named properties
   return {
-    master: walletArray[0]!,
-    alice: walletArray[1]!,
-    bob: walletArray[2]!,
-    charlie: walletArray[3]!,
-    diana: walletArray[4]!,
-    eve: walletArray[5]!,
-    server: walletArray[6]!,
+    funding: walletArray[0]!,
+    broker: walletArray[1]!,
+    server: walletArray[2]!,
+    alice: walletArray[3]!,
+    bob: walletArray[4]!,
+    charlie: walletArray[5]!,
+    diana: walletArray[6]!,
+    eve: walletArray[7]!,
     all: walletArray,
-    players: [walletArray[1]!, walletArray[2]!, walletArray[3]!, walletArray[4]!, walletArray[5]!],
+    players: [walletArray[3]!, walletArray[4]!, walletArray[5]!, walletArray[6]!, walletArray[7]!],
   };
 }
 

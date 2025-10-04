@@ -13,18 +13,19 @@
  *   bun run status server    # Show only Server
  */
 
-import { formatEther } from 'viem';
 import { loadWallets, createPublicRpcClient, type Wallet } from './utils/wallets';
 import { NitroliteClient, ChannelStatus } from '@erc7824/nitrolite';
 import { SEPOLIA_CONFIG } from './utils/contracts';
 import { connectToClearNode, authenticateClearNode } from './yellow-integration';
 import { getLedgerBalances } from './utils/clearnode';
+import { getUSDCBalance, formatUSDC } from './utils/erc20';
+import { formatEther } from 'viem';
 
 /**
- * Format ETH with more decimals for precision
+ * Format USDC with more decimals for precision
  */
-function formatEthBalance(wei: bigint): string {
-  return formatEther(wei).padStart(14);
+function formatUsdcBalance(wei: bigint): string {
+  return formatUSDC(wei).padStart(14);
 }
 
 async function main() {
@@ -49,22 +50,36 @@ async function main() {
     walletsToShow = wallets.all;
   }
 
-  // Wallet balances
-  console.log('═══════════════════════════════════════════════════════════════════════════════');
-  console.log('                              WALLET BALANCES                                  ');
-  console.log('═══════════════════════════════════════════════════════════════════════════════');
-  console.log('┌──────────┬────────────────────────────────────────────┬────────────────┐');
-  console.log('│ Wallet   │ Address                                    │ ETH            │');
-  console.log('├──────────┼────────────────────────────────────────────┼────────────────┤');
+  // Get wallet role icons
+  const getRoleIcon = (name: string) => {
+    switch (name) {
+      case 'Funding': return '💰';
+      case 'Broker': return '🏦';
+      case 'Server': return '🎮';
+      default: return '👤';
+    }
+  };
+
+  // Wallet balances (both ETH and USDC)
+  console.log('═══════════════════════════════════════════════════════════════════════════════════════════');
+  console.log('                                  WALLET BALANCES                                          ');
+  console.log('═══════════════════════════════════════════════════════════════════════════════════════════');
+  console.log('┌───┬──────────┬────────────────────────────────────────────┬──────────────┬──────────────┐');
+  console.log('│   │ Wallet   │ Address                                    │ ETH (gas)    │ USDC (game)  │');
+  console.log('├───┼──────────┼────────────────────────────────────────────┼──────────────┼──────────────┤');
 
   for (const wallet of walletsToShow) {
-    const balance = await publicClient.getBalance({ address: wallet.address });
-    const ethBalance = formatEthBalance(balance);
+    const ethBalance = await publicClient.getBalance({ address: wallet.address });
+    const usdcBalance = await getUSDCBalance(wallet, wallet.address);
 
-    console.log(`│ ${wallet.name.padEnd(8)} │ ${wallet.address} │ ${ethBalance} │`);
+    const icon = getRoleIcon(wallet.name);
+    const ethFormatted = formatEther(ethBalance).padStart(12);
+    const usdcFormatted = formatUsdcBalance(usdcBalance);
+
+    console.log(`│ ${icon} │ ${wallet.name.padEnd(8)} │ ${wallet.address} │ ${ethFormatted} │ ${usdcFormatted} │`);
   }
 
-  console.log('└──────────┴────────────────────────────────────────────┴────────────────┘\n');
+  console.log('└───┴──────────┴────────────────────────────────────────────┴──────────────┴──────────────┘\n');
 
   // Off-chain ledger balances (from ClearNode)
   console.log('═══════════════════════════════════════════════════════════════════════════════');
@@ -145,7 +160,7 @@ async function main() {
       const channelIds = await client.getOpenChannels();
 
       console.log(`┌─ ${wallet.name} (${wallet.address.slice(0, 10)}...${wallet.address.slice(-8)})`);
-      console.log(`│  💰 Custody Balance: ${formatEthBalance(custodyBalance)} ETH`);
+      console.log(`│  💰 Custody Balance: ${formatUsdcBalance(custodyBalance)} USDC`);
       console.log(`│  📊 Open Channels: ${channelIds.length}`);
 
       if (channelIds.length > 0) {
@@ -171,7 +186,7 @@ async function main() {
           console.log(`│  ${prefix} Channel ${channelId.slice(0, 10)}...`);
           console.log(`│      • Status: ${statusName}`);
           console.log(`│      • Counterparty: ${counterparty?.slice(0, 10)}...${counterparty?.slice(-8)}`);
-          console.log(`│      • Balance: ${formatEthBalance(channelBalance)} ETH`);
+          console.log(`│      • Balance: ${formatUsdcBalance(channelBalance)} USDC`);
           console.log(`│      • State Version: ${channelData.lastValidState.version}`);
           if (i < channelIds.length - 1) console.log('│');
         }

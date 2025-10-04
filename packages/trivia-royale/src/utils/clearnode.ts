@@ -38,10 +38,11 @@ import {
 import { SEPOLIA_CONFIG } from './contracts';
 import type { Wallet } from './wallets';
 import type { Address, Hex } from 'viem';
-import { createWalletClient, http, parseEther, parseUnits } from 'viem';
+import { createWalletClient, http, parseUnits } from 'viem';
 import { createNitroliteClient } from './channels';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
+import { parseUSDC, ensureAllowance } from './erc20';
 
 /**
  * Connect and authenticate all participants to ClearNode
@@ -81,14 +82,17 @@ export async function connectAllParticipants(
 export async function createChannelViaRPC(
   ws: WebSocket,
   wallet: Wallet,
-  amount: string = '0.0001' // Default amount in ETH
+  amount: string = '10' // Default amount in USDC
 ): Promise<Hex> {
   return new Promise(async (resolve, reject) => {
     try {
-      // Step 1: Deposit funds to custody contract
+      // Step 1: Approve custody contract to spend USDC
+      const amountWei = parseUSDC(amount);
+      await ensureAllowance(wallet, SEPOLIA_CONFIG.contracts.custody, amountWei);
+
+      // Step 2: Deposit funds to custody contract
       // Create NitroliteClient with broker as counterparty for the 2-party state channel
       const nitroliteClient = createNitroliteClient(wallet, SEPOLIA_CONFIG.contracts.brokerAddress);
-      const amountWei = parseEther(amount);
 
       // Step 2: Prepare RPC request
       const sessionSigner = createMessageSigner(createWalletClient({
@@ -235,17 +239,20 @@ export async function resizeChannelViaRPC(
   ws: WebSocket,
   wallet: Wallet,
   channelId: Hex,
-  additionalAmount: string // Amount to ADD in ETH
+  additionalAmount: string // Amount to ADD in USDC
 ): Promise<void> {
   return new Promise(async (resolve, reject) => {
     try {
-      console.log(`  💰 ${wallet.name}: Resizing channel by ${additionalAmount} ETH...`);
+      console.log(`  💰 ${wallet.name}: Resizing channel by ${additionalAmount} USDC...`);
 
       const nitroliteClient = createNitroliteClient(wallet, SEPOLIA_CONFIG.contracts.brokerAddress);
-      const amountWei = parseEther(additionalAmount);
+      const amountWei = parseUSDC(additionalAmount);
 
-      // Deposit funds to custody contract first
-      console.log(`  💳 ${wallet.name}: Depositing ${additionalAmount} ETH to custody...`);
+      // Approve custody contract first
+      await ensureAllowance(wallet, SEPOLIA_CONFIG.contracts.custody, amountWei);
+
+      // Deposit funds to custody contract
+      console.log(`  💳 ${wallet.name}: Depositing ${additionalAmount} USDC to custody...`);
       const depositTxHash = await nitroliteClient.deposit(SEPOLIA_CONFIG.contracts.tokenAddress, amountWei);
       const depositReceipt = await nitroliteClient.publicClient.waitForTransactionReceipt({ hash: depositTxHash });
 
@@ -610,14 +617,14 @@ export async function ensureSufficientBalance(
     return;
   }
 
-  const requiredWei = parseEther(requiredAmount);
-  const currentWei = BigInt(parseUnits(balance.amount, 18));
+  const requiredWei = parseUSDC(requiredAmount);
+  const currentWei = BigInt(parseUnits(balance.amount, SEPOLIA_CONFIG.token.decimals));
 
   if (currentWei < requiredWei) {
     const deficit = requiredWei - currentWei;
-    const deficitEth = (Number(deficit) / 1e18).toFixed(6);
-    console.log(`  ⚠️  ${wallet.name}: Insufficient balance (need ${deficitEth} more ETH)`);
-    await resizeChannelViaRPC(ws, wallet, channelId, deficitEth);
+    const deficitUsdc = (Number(deficit) / 10 ** SEPOLIA_CONFIG.token.decimals).toFixed(SEPOLIA_CONFIG.token.decimals);
+    console.log(`  ⚠️  ${wallet.name}: Insufficient balance (need ${deficitUsdc} more USDC)`);
+    await resizeChannelViaRPC(ws, wallet, channelId, deficitUsdc);
   } else {
     console.log(`  ✅ ${wallet.name}: Sufficient balance`);
   }

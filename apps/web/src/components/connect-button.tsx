@@ -5,69 +5,65 @@ import { Button } from "./ui/button";
 import { useNitroliteAuth } from "@/hooks/useNitroliteAuth";
 
 export function ConnectButton() {
-	const { address, isConnected } = useAccount();
-	const { connect, connectors, isPending } = useConnect();
-	const { disconnect } = useDisconnect();
-	const {
-		status: authStatus,
-		error: authError,
-		sessionKey,
-		connectAndAuthenticate,
-		disconnect: disconnectAuth,
-	} = useNitroliteAuth();
+	const account = useAccount();
+	const connect = useConnect();
+	const disconnect = useDisconnect();
+	const nitroliteAuth = useNitroliteAuth();
 
-	if (isConnected && address) {
+	if (account.isConnected && account.address) {
 		return (
 			<div className="flex flex-col gap-2">
 				<div className="flex items-center gap-2">
 					<span className="text-sm">
-						{address.slice(0, 6)}...{address.slice(-4)}
+						{account.address.slice(0, 6)}...{account.address.slice(-4)}
 					</span>
 					<Button
 						variant="outline"
 						onClick={() => {
-							disconnectAuth();
-							disconnect();
+							nitroliteAuth.disconnect();
+							disconnect.disconnect();
 						}}
 					>
 						Disconnect
 					</Button>
 				</div>
 
-				{authStatus === "idle" && (
-					<Button onClick={connectAndAuthenticate} size="sm">
+				{nitroliteAuth.status === "idle" && (
+					<Button onClick={nitroliteAuth.connectAndAuthenticate} size="sm">
 						Sign & Authenticate
 					</Button>
 				)}
 
-				{authStatus === "connecting" && (
+				{nitroliteAuth.status === "connecting" && (
 					<Button disabled size="sm">
 						Connecting to ClearNode...
 					</Button>
 				)}
 
-				{authStatus === "signing" && (
+				{nitroliteAuth.status === "signing" && (
 					<Button disabled size="sm">
 						Please sign message...
 					</Button>
 				)}
 
-				{authStatus === "authenticating" && (
+				{nitroliteAuth.status === "authenticating" && (
 					<Button disabled size="sm">
 						Authenticating...
 					</Button>
 				)}
 
-				{authStatus === "authenticated" && sessionKey && (
-					<div className="text-xs text-green-600 dark:text-green-400">
-						✓ Authenticated (Session: {sessionKey.slice(0, 6)}...
-						{sessionKey.slice(-4)})
-					</div>
-				)}
+				{nitroliteAuth.status === "authenticated" &&
+					nitroliteAuth.sessionKey && (
+						<div className="text-xs text-green-600 dark:text-green-400">
+							✓ Authenticated (Session:{" "}
+							{nitroliteAuth.sessionKey.slice(0, 6)}...
+							{nitroliteAuth.sessionKey.slice(-4)})
+						</div>
+					)}
 
-				{authStatus === "error" && authError && (
+				{nitroliteAuth.status === "error" && nitroliteAuth.error && (
 					<div className="text-xs text-red-600 dark:text-red-400">
-						Error: {authError}
+						Error: {nitroliteAuth.error}
 					</div>
 				)}
 			</div>
@@ -76,13 +72,13 @@ export function ConnectButton() {
 
 	return (
 		<div className="flex gap-2">
-			{connectors.map((connector) => (
+			{connect.connectors.map((connector) => (
 				<Button
 					key={connector.uid}
-					onClick={() => connect({ connector })}
-					disabled={isPending}
+					onClick={() => connect.connect({ connector })}
+					disabled={connect.isPending}
 				>
-					{isPending ? "Connecting..." : `Connect ${connector.name}`}
+					{connect.isPending ? "Connecting..." : `Connect ${connector.name}`}
 				</Button>
 			))}
 		</div>

@@ -23,8 +23,8 @@ services:
       PGDATABASE: ${POSTGRES_DB:-postgres}
       PGHOST: database
       PGPORT: 5432
-      # Native ETH on Sepolia
-      TOKEN_ADDRESS: ${TOKEN_ADDRESS:-0x0000000000000000000000000000000000000000}
+      # USDC on Sepolia
+      TOKEN_ADDRESS: ${TOKEN_ADDRESS:-0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238}
       CHAIN_ID: ${CHAIN_ID:-11155111}
     volumes:
       - ../nitrolite/clearnode/config/migrations/postgres:/migrations
@@ -70,12 +70,12 @@ services:
         TOKEN_EXISTS=$$(psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -t -c \"SELECT COUNT(*) FROM assets WHERE token = '$$TOKEN_ADDRESS' AND chain_id = $$CHAIN_ID;\" | xargs) &&
 
         if [ \"$$TOKEN_EXISTS\" -eq \"0\" ]; then
-          echo 'Seeding database with ETH token...' &&
+          echo 'Seeding database with USDC token...' &&
           psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"
             INSERT INTO assets (token, chain_id, symbol, decimals)
-            VALUES ('$$TOKEN_ADDRESS', $$CHAIN_ID, 'ETH', 18);
+            VALUES ('$$TOKEN_ADDRESS', $$CHAIN_ID, 'USDC', 6);
           \" &&
-          echo 'Database seeded with ETH token successfully'
+          echo 'Database seeded with USDC token successfully'
         else
           echo 'Database already seeded, skipping'
         fi
@@ -97,7 +97,9 @@ services:
       db-init:
         condition: service_completed_successfully
     environment:
-      # Broker signing key (Master wallet from mnemonic - has balance on Sepolia)
+      # Broker signing key (Broker wallet - index 1 from mnemonic)
+      # IMPORTANT: This must be derived from mnemonic index 1, NOT index 0
+      # The Funding wallet (index 0) is separate and only used for distribution
       BROKER_PRIVATE_KEY: ${BROKER_PRIVATE_KEY:-0x0af8bef0c6b3d7b0058d201b0b61deafa633442d1052e8c2fdc050a382f847ff}
 
       # Ethereum Sepolia Network Configuration (Chain ID: 11155111)

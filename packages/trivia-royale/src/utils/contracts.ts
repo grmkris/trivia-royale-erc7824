@@ -6,22 +6,33 @@ export const SEPOLIA_CONFIG = {
   contracts: {
     custody: '0x019B65A265EB3363822f2752141b3dF16131b262' as const, // Latest: 2025-08-27
     adjudicator: '0x7c7ccbc98469190849BCC6c926307794fDfB11F2' as const, // Latest: 2025-08-27
-    tokenAddress: '0x0000000000000000000000000000000000000000' as const, // Native ETH
-    // ClearNode broker address (Master wallet - has balance on Sepolia)
-    // Derived from mnemonic index 0: 0x0af8bef0c6b3d7b0058d201b0b61deafa633442d1052e8c2fdc050a382f847ff
-    brokerAddress: '0x71DB80a0eaB6Ef826B95acB29a5E8E86e9a95cF9' as const,
+    tokenAddress: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as const, // USDC on Sepolia
+    // ClearNode broker address (Broker wallet - index 1)
+    // This address must match the BROKER_PRIVATE_KEY in docker-compose.yml
+    // Derived from mnemonic index 1
+    brokerAddress: '0x71DB80a0eaB6Ef826B95acB29a5E8E86e9a95cF9' as const, // UPDATE THIS after deriving from index 1
+  },
+
+  token: {
+    symbol: 'USDC',
+    decimals: 6,
   },
 
   funding: {
-    masterAmount: '0.5',      // Fund master with 0.5 ETH from faucet
-    distributionAmount: '0.08', // Each wallet gets 0.08 ETH
+    // Funding wallet reserves (received from faucets)
+    fundingGasReserve: '1',      // 1 ETH for Funding wallet
+    fundingGameReserve: '200',   // 200 USDC for Funding wallet
+
+    // Distribution amounts per wallet
+    gasAmount: '0.1',            // ETH for gas (to Broker, Server, Players)
+    gameAmount: '20',            // USDC for game (to Server and Players only)
   },
 
   game: {
-    asset: 'ETH',
-    channelDeposit: '0.01',   // Channel deposit: 0.01 ETH (~100 games worth)
-    entryFee: '0.0001',       // 0.0001 ETH per player (testing amount)
-    prizePool: '0.0005',      // 5 × 0.0001 ETH
+    asset: 'USDC',
+    channelDeposit: '10',     // Channel deposit: 10 USDC (~100 games worth)
+    entryFee: '0.1',          // 0.1 USDC per player (testing amount)
+    prizePool: '0.5',         // 5 × 0.1 USDC
     maxPlayers: 5,
     rounds: 3,
     commitTimeoutMs: 5000,

@@ -18,8 +18,9 @@ import {
 } from './utils/wallets';
 import { SEPOLIA_CONFIG } from './utils/contracts';
 import { env } from './env';
+import { getUSDCBalance, formatUSDC, parseUSDC } from './utils/erc20';
 
-const WALLET_NAMES = ['Master', 'Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Server'];
+const WALLET_NAMES = ['Funding', 'Broker', 'Server', 'Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
 
 async function main() {
   console.log('\n🎮 TRIVIA ROYALE - Setup\n');
@@ -43,8 +44,9 @@ async function main() {
 
     console.log('\n📋 Next Steps:');
     console.log('   1. Save MNEMONIC to .env file');
-    console.log('   2. Fund Master wallet (index 0) with 0.5 ETH from faucet:');
-    console.log('      https://faucets.chain.link/sepolia');
+    console.log('   2. Fund Funding wallet (index 0) with:');
+    console.log(`      - ${SEPOLIA_CONFIG.funding.fundingGasReserve} ETH from: https://faucets.chain.link/sepolia`);
+    console.log(`      - ${SEPOLIA_CONFIG.funding.fundingGameReserve} USDC from: https://faucet.circle.com/`);
     console.log('   3. Run: bun run fund');
     console.log('   4. Run: bun run play\n');
 
@@ -55,27 +57,42 @@ async function main() {
   console.log('✅ Using existing MNEMONIC from .env\n');
 
   const wallets = loadWallets();
-  const master = wallets.master;
+  const funding = wallets.funding;
   const publicClient = createPublicRpcClient();
 
-  // Check master balance
-  const masterBalance = await publicClient.getBalance({ address: master.address });
+  // Check funding wallet balances (both ETH and USDC)
+  const ethBalance = await publicClient.getBalance({ address: funding.address });
+  const usdcBalance = await getUSDCBalance(funding, funding.address);
 
-  console.log('💰 Master Wallet:\n');
-  console.log(`   Address: ${master.address}`);
-  console.log(`   Balance: ${formatEther(masterBalance)} ETH\n`);
+  console.log('💰 Funding Wallet:\n');
+  console.log(`   Address: ${funding.address}`);
+  console.log(`   ETH Balance:  ${formatEther(ethBalance)}`);
+  console.log(`   USDC Balance: ${formatUSDC(usdcBalance)}\n`);
 
-  const requiredAmount = parseEther(SEPOLIA_CONFIG.funding.masterAmount);
+  const requiredEth = parseEther(SEPOLIA_CONFIG.funding.fundingGasReserve);
+  const requiredUsdc = parseUSDC(SEPOLIA_CONFIG.funding.fundingGameReserve);
 
-  if (masterBalance < requiredAmount) {
-    console.log('⚠️  MASTER WALLET NEEDS FUNDING!\n');
-    console.log(`   Required: ${SEPOLIA_CONFIG.funding.masterAmount} ETH`);
-    console.log(`   Current:  ${formatEther(masterBalance)} ETH\n`);
-    console.log('📋 Get ETH from faucet:');
-    console.log('   https://faucets.chain.link/sepolia\n');
-    console.log(`   Send to: ${master.address}\n`);
+  const needsEth = ethBalance < requiredEth;
+  const needsUsdc = usdcBalance < requiredUsdc;
+
+  if (needsEth || needsUsdc) {
+    console.log('⚠️  FUNDING WALLET NEEDS FUNDING!\n');
+
+    if (needsEth) {
+      console.log(`   ETH Required:  ${SEPOLIA_CONFIG.funding.fundingGasReserve} ETH`);
+      console.log(`   ETH Current:   ${formatEther(ethBalance)} ETH`);
+      console.log('   📋 Get ETH from: https://faucets.chain.link/sepolia\n');
+    }
+
+    if (needsUsdc) {
+      console.log(`   USDC Required: ${SEPOLIA_CONFIG.funding.fundingGameReserve} USDC`);
+      console.log(`   USDC Current:  ${formatUSDC(usdcBalance)} USDC`);
+      console.log('   📋 Get USDC from: https://faucet.circle.com/\n');
+    }
+
+    console.log(`   Send to: ${funding.address}\n`);
   } else {
-    console.log('✅ Master wallet has sufficient funds\n');
+    console.log('✅ Funding wallet has sufficient funds\n');
     console.log('📋 Next Steps:');
     console.log('   1. Run: bun run fund');
     console.log('   2. Run: bun run play\n');

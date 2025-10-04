@@ -72,12 +72,13 @@
  * 5. Close session and disconnect - Line 438+
  */
 
-import { parseEther, formatEther, keccak256, encodePacked, type Hex, type Address, parseUnits } from 'viem';
+import { keccak256, encodePacked, type Hex, type Address, parseUnits } from 'viem';
 import {
   loadWallets,
   type Wallet,
 } from './utils/wallets';
 import { SEPOLIA_CONFIG } from './utils/contracts';
+import { parseUSDC, formatUSDC } from './utils/erc20';
 import {
   connectAllParticipants,
   disconnectAll,
@@ -199,7 +200,7 @@ async function setupChannelsViaRPC(
         const balances = await getLedgerBalances(ws, player);
         const balance = balances.find(b => b.asset === SEPOLIA_CONFIG.game.asset);
 
-        if (!balance || BigInt(parseUnits(balance.amount, 18)) === 0n) {
+        if (!balance || BigInt(parseUnits(balance.amount, SEPOLIA_CONFIG.token.decimals)) === 0n) {
           // Channel exists but is drained - close it and create a fresh one
           console.log(`  🔄 ${player.name}: Closing drained channel...`);
           await closeChannelViaRPC(ws, player, existingChannel);
@@ -277,8 +278,8 @@ async function playGame(
     }
 
     // Re-authenticate with allowances
-    // Convert ETH to WEI for allowances (must be whole number string)
-    const amountWei = parseEther(allocation.amount).toString();
+    // Convert USDC to smallest unit for allowances (must be whole number string)
+    const amountWei = parseUSDC(allocation.amount).toString();
     await authenticateForAppSession(playerWs, player, [
       {
         asset: allocation.asset,
@@ -448,7 +449,7 @@ function displayResults(results: GameResults): PrizeDistribution[] {
   const prizes = calculatePrizes(sortedResults);
   prizes.forEach(({ name, change }) => {
     const sign = parseFloat(change) >= 0 ? '+' : '';
-    console.log(`   ${name}: ${sign}${change} ETH`);
+    console.log(`   ${name}: ${sign}${change} USDC`);
   });
 
   return prizes;
