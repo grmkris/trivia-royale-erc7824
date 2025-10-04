@@ -34,9 +34,11 @@ import {
   type CreateChannelRequestParams,
   type UnsignedState,
   RPCChannelStatus,
+  RPCChannelUpdate,
   parseChannelUpdateResponse,
+  type State,
 } from '@erc7824/nitrolite';
-import { SEPOLIA_CONFIG } from './contracts';
+import { SEPOLIA_CONFIG, getEtherscanTxLink } from './contracts';
 import type { Wallet } from './wallets';
 import type { Address, Hex } from 'viem';
 import { createWalletClient, http, parseUnits } from 'viem';
@@ -83,7 +85,8 @@ export async function connectAllParticipants(
 export async function createChannelViaRPC(
   ws: WebSocket,
   wallet: Wallet,
-  amount: string = '10' // Default amount in USDC
+  amount: string = '10', // Default amount in USDC
+  stateStorage?: { appendChannelState: (channelId: Hex, state: State) => Promise<void> }
 ): Promise<Hex> {
   return new Promise(async (resolve, reject) => {
     try {
@@ -140,7 +143,8 @@ export async function createChannelViaRPC(
               // 1. Sign the state with wallet's key
               // 2. Combine both signatures (wallet + server)
               // 3. Call custody contract's depositAndCreate() with both signatures
-              const { channelId, txHash } = await nitroliteClient.depositAndCreateChannel(
+
+              const { channelId, txHash, initialState } = await nitroliteClient.depositAndCreateChannel(
                 SEPOLIA_CONFIG.contracts.tokenAddress,
                 amountWei,
                 {
@@ -149,8 +153,13 @@ export async function createChannelViaRPC(
                   serverSignature,                             // Passed separately
                 });
 
-              console.log(`  📤 ${wallet.name}: Transaction submitted (${txHash.slice(0, 10)}...)`);
+              console.log(`  📤 ${wallet.name}: Transaction submitted: ${getEtherscanTxLink(txHash)}`);
               console.log(`  ⏳ ${wallet.name}: Waiting for confirmation...`);
+
+              // Store the initial state if storage provided
+              if (stateStorage && initialState) {
+                await stateStorage.appendChannelState(channelId, initialState);
+              }
 
               // listen for channel update event
               const handleChannelUpdate = (event: MessageEvent) => {
@@ -177,8 +186,6 @@ export async function createChannelViaRPC(
               
               console.log(`  ✅ ${wallet.name}: Transaction confirmed`);
               console.log(`  📡 ${wallet.name}: ClearNode will detect event and populate ledger`);
-
-              resolve(channelId);
             } catch (error) {
               console.error(`  ❌ ${wallet.name}: Error submitting channel transaction: ${JSON.stringify(error)}`);
               reject(new Error(`Failed to submit channel transaction: ${error instanceof Error ? error.message : 'Unknown error'}`));
@@ -193,6 +200,19 @@ export async function createChannelViaRPC(
             if (channelExistsMatch) {
               const existingChannelId = channelExistsMatch[1] as Hex;
               console.log(`  ℹ️  ${wallet.name}: Channel already exists, using ${existingChannelId.slice(0, 10)}...`);
+
+              // Fetch current state from blockchain and store it
+              if (stateStorage) {
+                try {
+                  const nitroliteClient = createNitroliteClient(wallet, SEPOLIA_CONFIG.contracts.brokerAddress);
+                  const channelData = await nitroliteClient.getChannelData(existingChannelId);
+                  await stateStorage.appendChannelState(existingChannelId, channelData.lastValidState);
+                  console.log(`  📝 ${wallet.name}: Stored existing channel state (v${channelData.lastValidState.version})`);
+                } catch (error) {
+                  console.error(`  ⚠️  ${wallet.name}: Failed to fetch existing channel state:`, error);
+                }
+              }
+
               resolve(existingChannelId);
             } else {
               console.error(`  ❌ ${wallet.name}: ClearNode error:`, response.params);
@@ -283,7 +303,7 @@ export async function resizeChannelViaRPC(
                 proofStates: [],
               });
 
-              console.log(`  📤 ${wallet.name}: Resize tx submitted (${txHash.slice(0, 10)}...)`);
+              console.log(`  📤 ${wallet.name}: Resize tx submitted: ${getEtherscanTxLink(txHash)}`);
 
               await nitroliteClient.publicClient.waitForTransactionReceipt({ hash: txHash });
 
@@ -465,7 +485,7 @@ export async function getChannelWithBroker(
             if (channels.length > 0) {
               const channel = channels[0];
               // Return first channel - should be the broker channel
-              if (channel.channelId) {
+              if (channel?.channelId) {
                 console.log(`  ✅ ${wallet.name}: Using channel ${channel.channelId.slice(0, 10)}...`);
                 resolve(channel.channelId);
               } else {

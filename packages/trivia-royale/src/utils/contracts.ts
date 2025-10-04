@@ -1,3 +1,10 @@
+/**
+ * Get Etherscan transaction link for Sepolia
+ */
+export function getEtherscanTxLink(txHash: string): string {
+  return `https://sepolia.etherscan.io/tx/${txHash}`;
+}
+
 export const SEPOLIA_CONFIG = {
   chainId: 11155111,
   rpcUrl: 'https://rpc.ankr.com/eth_sepolia',

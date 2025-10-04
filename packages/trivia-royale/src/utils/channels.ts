@@ -22,7 +22,7 @@ export function createNitroliteClient(
 
   return new NitroliteClient({
     publicClient,
-    walletClient: playerWallet.client,
+    walletClient: playerWallet.walletClient,
     stateSigner,
     challengeDuration: 3600n,
     addresses: {

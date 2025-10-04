@@ -24,6 +24,19 @@ const WALLET_NAMES = [
   'Test8',     // index 15 - Test8 wallet (clean slate for e2e tests)
   'Test9',     // index 16 - Test9 wallet (clean slate for e2e tests)
   'Test10',    // index 17 - Test10 wallet (clean slate for e2e tests)
+  'Test11',    // index 18 - Test11 wallet (clean slate for e2e tests)
+  'Test12',    // index 19 - Test12 wallet (clean slate for e2e tests)
+  'Test13',    // index 20 - Test13 wallet (clean slate for e2e tests)
+  'Test14',    // index 21 - Test14 wallet (clean slate for e2e tests)
+  'Test15',    // index 22 - Test15 wallet (clean slate for e2e tests)
+  'Test16',    // index 23 - Test16 wallet (clean slate for e2e tests)
+  'Test17',    // index 24 - Test17 wallet (clean slate for e2e tests)
+  'Test18',    // index 25 - Test18 wallet (clean slate for e2e tests)
+  'Test19',    // index 26 - Test19 wallet (clean slate for e2e tests)
+  'Test20',    // index 27 - Test20 wallet (clean slate for e2e tests)
+  'Test21',    // index 28 - Test21 wallet (clean slate for e2e tests)
+  'Test22',    // index 29 - Test22 wallet (clean slate for e2e tests)
+  'Test23',    // index 30 - Test23 wallet (clean slate for e2e tests)
 ] as const;
 
 export interface Wallet {
@@ -60,6 +73,19 @@ export interface Wallets {
   test8: Wallet;
   test9: Wallet;
   test10: Wallet;
+  test11: Wallet;
+  test12: Wallet;
+  test13: Wallet;
+  test14: Wallet;
+  test15: Wallet;
+  test16: Wallet;
+  test17: Wallet;
+  test18: Wallet;
+  test19: Wallet;
+  test20: Wallet;
+  test21: Wallet;
+  test22: Wallet;
+  test23: Wallet;
   all: Wallet[];
   players: Wallet[];
 }
@@ -121,6 +147,19 @@ export function loadWallets(): Wallets {
     test8: walletArray[15]!,
     test9: walletArray[16]!,
     test10: walletArray[17]!,
+    test11: walletArray[18]!,
+    test12: walletArray[19]!,
+    test13: walletArray[20]!,
+    test14: walletArray[21]!,
+    test15: walletArray[22]!,
+    test16: walletArray[23]!,
+    test17: walletArray[24]!,
+    test18: walletArray[25]!,
+    test19: walletArray[26]!,
+    test20: walletArray[27]!,
+    test21: walletArray[28]!,
+    test22: walletArray[29]!,
+    test23: walletArray[30]!,
     all: walletArray,
     players: [walletArray[3]!, walletArray[4]!, walletArray[5]!, walletArray[6]!, walletArray[7]!],
   };

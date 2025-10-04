@@ -113,7 +113,7 @@ export async function transferUSDC(
     functionName: 'transfer',
     args: [to, amountWei],
     account: fromWallet.account,
-    chain: sepolia,
+    chain: SEPOLIA_CONFIG.chain,
   });
 
   return hash;

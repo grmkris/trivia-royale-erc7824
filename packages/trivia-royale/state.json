@@ -1,0 +1,92 @@
+{
+  "0x4aadb2cf475be56fdfde7ed4fd0d8004a7fc56365a83c982042a56e0aae2916c": [
+    {
+      "intent": 1,
+      "version": "0",
+      "data": "0x",
+      "allocations": [
+        {
+          "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+          "destination": "0x09BD0C0AC80E141dbDcd01289222770a3b5B15eb",
+          "amount": "100"
+        },
+        {
+          "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+          "destination": "0xa5819442D1A69337ca93b688994Ae27E8C58D019",
+          "amount": "0"
+        }
+      ],
+      "sigs": [
+        "0xa72ee90054446439746974bd8f5eddafe8eb0965b76c2f4f077404b5f2a1a6fc60d08aaca035a371445f9f18680e6a394bad2c5e37630f49f318d2392b16a89d1c",
+        "0xfa97cf99f5d03d6327590672daf363ffa5a1860045ed1aaf164edea917bc4f90626aae173a4e501216d6416faf06aa61eb1ed62ed269703f39d74309267584261b"
+      ]
+    },
+    {
+      "intent": 2,
+      "version": "1",
+      "data": "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000640000000000000000000000000000000000000000000000000000000000000000",
+      "allocations": [
+        {
+          "destination": "0x09BD0C0AC80E141dbDcd01289222770a3b5B15eb",
+          "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+          "amount": "200"
+        },
+        {
+          "destination": "0xa5819442D1A69337ca93b688994Ae27E8C58D019",
+          "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+          "amount": "0"
+        }
+      ],
+      "sigs": [
+        "0x6ad0d99d4288a1bf34e3075b6535537b50f0cb68efc6982f452080fdcbd7c16b43321d5a6149da26556d3afb72e5be4bd4dc7343fc7625bf80b245492dd216661c",
+        "0xd7d0a2f3fc5487410a05f8884b14d43ff88f723595d6b4a3adeb03aa6f6696ad64916c36d881b83a4c0a2ec664f1c2437b546f555f6e94ec0923bbcec93eb0b81c"
+      ]
+    }
+  ],
+  "0x5a0581f65bda1e122505ece9a03aab2ad0f4d69ab8b17c0514cfbaf885bf2a70": [
+    {
+      "intent": 1,
+      "version": "0",
+      "data": "0x",
+      "allocations": [
+        {
+          "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+          "destination": "0x709E25A9eEfc40AB4B8F1a0a9aAc72DF29B23c33",
+          "amount": "100"
+        },
+        {
+          "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+          "destination": "0xa5819442D1A69337ca93b688994Ae27E8C58D019",
+          "amount": "0"
+        }
+      ],
+      "sigs": [
+        "0xea373f3da16003f8a060e3e476be5da1cb5a9be173827becad4867ccf63e5e4568bc206d33ee7a5ece1efccc719dd341fd6359f8a55be4876684d7770e94154f1b",
+        "0xa4999a553f67844eacf19fb3f01ba408345ecc8be5527f5ff37fcc34a939fff84aa7c014ae9402a63f68c39f19797f46371fe9d0a0a08042717e3935fd14d8861b"
+      ]
+    }
+  ],
+  "0x9b51d26977cbc85c3fc8307beb545143153b0f03b97e0e2cd281a788dcdee5bc": [
+    {
+      "intent": 1,
+      "version": "0",
+      "data": "0x",
+      "allocations": [
+        {
+          "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+          "destination": "0x315433938D529FF9fe4f57Ad363076C116e1027f",
+          "amount": "100"
+        },
+        {
+          "token": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+          "destination": "0xa5819442D1A69337ca93b688994Ae27E8C58D019",
+          "amount": "0"
+        }
+      ],
+      "sigs": [
+        "0xe860bdaee924944ead756102f10b4d6c4149852ab88df6b3520b5090e5a5434b1ab09e6355e36fc86d460c8c44fafbfff3685076458973c599385e6899eba97b1c",
+        "0x70a682fb64021aee0fb8b12c70eaa3720c38f3370f7b02636ea54e7a8e9b916c6fa81a3df794731cef03aed8ba241a8a3d62e2b2bc25720a9edde00d7cfe767b1b"
+      ]
+    }
+  ]
+}

@@ -15,7 +15,7 @@
  */
 
 import { loadWallets, createPublicRpcClient, type Wallet } from './utils/wallets';
-import { SEPOLIA_CONFIG } from './utils/contracts';
+import { SEPOLIA_CONFIG, getEtherscanTxLink } from './utils/contracts';
 import { connectToClearNode, authenticateClearNode } from './yellow-integration';
 import {
   getLedgerBalances,
@@ -89,7 +89,7 @@ async function cashout(wallet: Wallet) {
       finalCustodyBalance
     );
 
-    console.log(`   📤 Transaction submitted: ${txHash.slice(0, 10)}...`);
+    console.log(`   📤 Transaction submitted: ${getEtherscanTxLink(txHash)}`);
 
     await publicClient.waitForTransactionReceipt({ hash: txHash });
 

@@ -11,7 +11,7 @@ import {
   createPublicRpcClient,
   type Wallet,
 } from './utils/wallets';
-import { SEPOLIA_CONFIG } from './utils/contracts';
+import { SEPOLIA_CONFIG, getEtherscanTxLink } from './utils/contracts';
 import { transferUSDC, getUSDCBalance, formatUSDC, parseUSDC } from './utils/erc20';
 import { formatEther, parseEther } from 'viem';
 import { sepolia } from 'viem/chains';
@@ -33,7 +33,7 @@ async function sendETH(
     chain: sepolia,
   });
 
-  console.log(`   ✅ ${target.name}: Sent ${amount} ETH (gas) (tx: ${hash.slice(0, 10)}...)`);
+  console.log(`   ✅ ${target.name}: Sent ${amount} ETH (gas) - ${getEtherscanTxLink(hash)}`);
 }
 
 /**
@@ -46,7 +46,7 @@ async function sendUSDC(
 ): Promise<void> {
   const hash = await transferUSDC(funding, target.address, amount);
 
-  console.log(`   ✅ ${target.name}: Sent ${amount} USDC (game) (tx: ${hash.slice(0, 10)}...)`);
+  console.log(`   ✅ ${target.name}: Sent ${amount} USDC (game) - ${getEtherscanTxLink(hash)}`);
 }
 
 /**
@@ -117,6 +117,19 @@ async function main() {
   const test8 = wallets.test8;
   const test9 = wallets.test9;
   const test10 = wallets.test10;
+  const test11 = wallets.test11;
+  const test12 = wallets.test12;
+  const test13 = wallets.test13;
+  const test14 = wallets.test14;
+  const test15 = wallets.test15;
+  const test16 = wallets.test16;
+  const test17 = wallets.test17;
+  const test18 = wallets.test18;
+  const test19 = wallets.test19;
+  const test20 = wallets.test20;
+  const test21 = wallets.test21;
+  const test22 = wallets.test22;
+  const test23 = wallets.test23;
   const publicClient = createPublicRpcClient();
 
   // Check funding wallet balances
@@ -132,11 +145,11 @@ async function main() {
   const walletNames = process.argv.slice(2);
 
   // All possible recipients (before filtering)
-  // Gas recipients: Broker + Server + 5 Players + Test + Test2 + Test3 + Test4 + Test5 + Test6 + Test7 + Test8 + Test9 + Test10 = 17 wallets
-  let gasRecipients = [broker, server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10];
+  // Gas recipients: Broker + Server + 5 Players + Test-Test23 = 30 wallets
+  let gasRecipients = [broker, server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23];
 
-  // Game recipients: Server + 5 Players + Test + Test2 + Test3 + Test4 + Test5 + Test6 + Test7 + Test8 + Test9 + Test10 = 16 wallets (Broker doesn't need USDC)
-  let gameRecipients = [server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10];
+  // Game recipients: Server + 5 Players + Test-Test23 = 29 wallets (Broker doesn't need USDC)
+  let gameRecipients = [server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23];
 
   // Apply filter if wallet names provided
   if (walletNames.length > 0) {

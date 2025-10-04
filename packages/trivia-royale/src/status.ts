@@ -67,6 +67,19 @@ async function main() {
       case 'Test8': return '🔎';
       case 'Test9': return '🔬';
       case 'Test10': return '⚛️';
+      case 'Test11': return '🧲';
+      case 'Test12': return '💠';
+      case 'Test13': return '🔮';
+      case 'Test14': return '🌟';
+      case 'Test15': return '⭐';
+      case 'Test16': return '✨';
+      case 'Test17': return '💫';
+      case 'Test18': return '🌠';
+      case 'Test19': return '☄️';
+      case 'Test20': return '🌌';
+      case 'Test21': return '🌀';
+      case 'Test22': return '🎆';
+      case 'Test23': return '🎇';
       default: return '👤';
     }
   };

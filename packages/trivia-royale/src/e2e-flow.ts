@@ -13,7 +13,7 @@
  */
 
 import { loadWallets, createPublicRpcClient, type Wallet } from './utils/wallets';
-import { SEPOLIA_CONFIG } from './utils/contracts';
+import { SEPOLIA_CONFIG, getEtherscanTxLink } from './utils/contracts';
 import { connectToClearNode, authenticateClearNode } from './yellow-integration';
 import {
   getLedgerBalances,
@@ -252,7 +252,7 @@ async function resizeIfNeeded(
     proofStates,
   });
 
-  console.log(`   📤 Resize tx submitted: ${txHash.slice(0, 10)}...`);
+  console.log(`   📤 Resize tx submitted: ${getEtherscanTxLink(txHash)}`);
 
   const publicClient = createPublicRpcClient();
   await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -335,7 +335,7 @@ async function closeChannel(
     stateData: closeResponse.params.state.stateData as Hex,
   });
 
-  console.log(`   📤 Close tx submitted: ${txHash.slice(0, 10)}...`);
+  console.log(`   📤 Close tx submitted: ${getEtherscanTxLink(txHash)}`);
 
   const publicClient = createPublicRpcClient();
   await publicClient.waitForTransactionReceipt({ hash: txHash });
