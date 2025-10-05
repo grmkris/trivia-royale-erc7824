@@ -138,7 +138,7 @@ describe('BetterNitrolite', () => {
   }, 200000);
 
 
-  it.only('should create session with distributed signatures', async () => {
+  it('should create session with distributed signatures', async () => {
     const wallets = loadWallets();
 
     // Create multiple clients (simulating players)

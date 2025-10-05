@@ -141,6 +141,22 @@ async function main() {
   const test32 = wallets.test32;
   const test33 = wallets.test33;
   const test34 = wallets.test34;
+  const test35 = wallets.test35;
+  const test36 = wallets.test36;
+  const test37 = wallets.test37;
+  const test38 = wallets.test38;
+  const test39 = wallets.test39;
+  const test40 = wallets.test40;
+  const test41 = wallets.test41;
+  const test42 = wallets.test42;
+  const test43 = wallets.test43;
+  const test44 = wallets.test44;
+  const test45 = wallets.test45;
+  const test46 = wallets.test46;
+  const test47 = wallets.test47;
+  const test48 = wallets.test48;
+  const test49 = wallets.test49;
+  const test50 = wallets.test50;
   const publicClient = createPublicRpcClient();
 
   // Check funding wallet balances
@@ -156,11 +172,11 @@ async function main() {
   const walletNames = process.argv.slice(2);
 
   // All possible recipients (before filtering)
-  // Gas recipients: Broker + Server + 5 Players + Test-Test34 = 41 wallets
-  let gasRecipients = [broker, server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34];
+  // Gas recipients: Broker + Server + 5 Players + Test-Test50 = 57 wallets
+  let gasRecipients = [broker, server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50];
 
-  // Game recipients: Server + 5 Players + Test-Test34 = 40 wallets (Broker doesn't need USDC)
-  let gameRecipients = [server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34];
+  // Game recipients: Server + 5 Players + Test-Test50 = 56 wallets (Broker doesn't need USDC)
+  let gameRecipients = [server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34, test35, test36, test37, test38, test39, test40, test41, test42, test43, test44, test45, test46, test47, test48, test49, test50];
 
   // Apply filter if wallet names provided
   if (walletNames.length > 0) {

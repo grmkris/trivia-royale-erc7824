@@ -1,5 +1,5 @@
 import { SEPOLIA_CONFIG } from "./utils/contracts";
-import { NitroliteClient, SessionKeyStateSigner, createResizeChannelMessage, parseResizeChannelResponse, parseAnyRPCResponse, RPCMethod, createCloseAppSessionMessage, parseMessageResponse } from "@erc7824/nitrolite";
+import { NitroliteClient, SessionKeyStateSigner, createResizeChannelMessage, parseCloseAppSessionResponse, parseResizeChannelResponse, parseAnyRPCResponse, RPCMethod, createCloseAppSessionMessage, parseMessageResponse } from "@erc7824/nitrolite";
 import type { Wallet } from "./utils/wallets";
 import type { Address, Chain, Hex } from "viem";
 import { connectToClearNode, authenticateClearNode, createMessageSigner } from "./yellow-integration";
@@ -19,7 +19,6 @@ import { z } from "zod";
 export interface MessageSchema {
   [key: string]: {
     data: any;
-    reply?: any;
   };
 }
 
@@ -27,8 +26,7 @@ export interface MessageSchema {
 type MessageHandler<T extends MessageSchema> = <K extends keyof T>(
   type: K,
   sessionId: Hex,
-  data: T[K]['data'],
-  reply?: T[K] extends { reply: infer R } ? (response: R) => Promise<void> : never
+  data: T[K]['data']
 ) => void | Promise<void>;
 
 // Session invite type
@@ -224,75 +222,44 @@ const createMessageHandler = <T extends MessageSchema>(props: {
       switch (response.method) {
         case RPCMethod.Message:
           const MessageResponseSchema = z.object({
-            app_session_id: z.string(),
+            app_session_id: z.custom<Hex>(),
             message: z.object({
               type: z.string(),
               data: z.unknown(),  
             }),
           });
-          const parsedSafe = MessageResponseSchema.safeParse(response.params);
-          if (!parsedSafe.success) {
+          const parsedResponse = MessageResponseSchema.safeParse(response.params);
+          if (!parsedResponse.success) {
             // console.error('Invalid message response:', parsedSafe.error);
             break;
           }
-          const parsed = parsedSafe.data;
-          console.log('Received message2:', parsed);
           // Handle application messages
-          if (props.onAppMessage && parsed) {
-            console.log('Received message3:', parsed);
-            const { app_session_id, message } = parsed;
+          if (props.onAppMessage && parsedResponse.success) {
+            const { app_session_id, message } = parsedResponse.data;
             if (message && app_session_id) {
               const messageType = message.type;
               const messageData = message.data || {};
-
               // Auto-join session when receiving first message
               if (!props.activeSessions.has(app_session_id)) {
                 props.activeSessions.add(app_session_id);
               }
-
-              // Create reply function if needed
-              let replyFn: any = undefined;
-              if (message.expectsReply && props.ws) {
-                replyFn = async (replyData: any) => {
-                  const signer = createMessageSigner(
-                    createWalletClient({
-                      account: privateKeyToAccount(props.wallet.sessionPrivateKey),
-                      chain: sepolia,
-                      transport: http(),
-                    })
-                  );
-                  const replyMessage = await createApplicationMessage(
-                    signer,
-                    app_session_id,
-                    {
-                      type: `${message.type}_response`,
-                      data: replyData,
-                      inReplyTo: message.id,
-                    }
-                  );
-
-                  props.ws!.send(replyMessage);
-                };
-              }
-
-              console.log('messageType4:', messageType);
-
               // Call user's handler
-              await props.onAppMessage(messageType, app_session_id, messageData, replyFn);
+              await props.onAppMessage(messageType, app_session_id, messageData);
             }
           }
           break;
         case RPCMethod.CloseAppSession:
+          const closeAppResponse = parseCloseAppSessionResponse(event.data);
           // Handle session close notifications
-          if (response.params?.appSessionId) {
-            const sessionId = response.params.appSessionId as Hex;
+          if (closeAppResponse.params?.appSessionId) {
+            const sessionId = closeAppResponse.params.appSessionId;
 
             // Remove from active sessions
             props.activeSessions.delete(sessionId);
 
             // Notify user if callback provided
             if (props.onSessionClosed) {
-              const finalAllocations = response.params.allocations || [];
+              const finalAllocations = closeAppResponse.params.allocations || [];
               props.onSessionClosed(sessionId, finalAllocations);
             }
 

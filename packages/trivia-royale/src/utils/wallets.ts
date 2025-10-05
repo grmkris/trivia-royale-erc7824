@@ -48,6 +48,22 @@ const WALLET_NAMES = [
   'Test32',    // index 39 - Test32 wallet (clean slate for e2e tests)
   'Test33',    // index 40 - Test33 wallet (clean slate for e2e tests)
   'Test34',    // index 41 - Test34 wallet (clean slate for e2e tests)
+  'Test35',    // index 42 - Test35 wallet (clean slate for e2e tests)
+  'Test36',    // index 43 - Test36 wallet (clean slate for e2e tests)
+  'Test37',    // index 44 - Test37 wallet (clean slate for e2e tests)
+  'Test38',    // index 45 - Test38 wallet (clean slate for e2e tests)
+  'Test39',    // index 46 - Test39 wallet (clean slate for e2e tests)
+  'Test40',    // index 47 - Test40 wallet (clean slate for e2e tests)
+  'Test41',    // index 48 - Test41 wallet (clean slate for e2e tests)
+  'Test42',    // index 49 - Test42 wallet (clean slate for e2e tests)
+  'Test43',    // index 50 - Test43 wallet (clean slate for e2e tests)
+  'Test44',    // index 51 - Test44 wallet (clean slate for e2e tests)
+  'Test45',    // index 52 - Test45 wallet (clean slate for e2e tests)
+  'Test46',    // index 53 - Test46 wallet (clean slate for e2e tests)
+  'Test47',    // index 54 - Test47 wallet (clean slate for e2e tests)
+  'Test48',    // index 55 - Test48 wallet (clean slate for e2e tests)
+  'Test49',    // index 56 - Test49 wallet (clean slate for e2e tests)
+  'Test50',    // index 57 - Test50 wallet (clean slate for e2e tests)
 ] as const;
 
 export interface Wallet {
@@ -108,6 +124,22 @@ export interface Wallets {
   test32: Wallet;
   test33: Wallet;
   test34: Wallet;
+  test35: Wallet;
+  test36: Wallet;
+  test37: Wallet;
+  test38: Wallet;
+  test39: Wallet;
+  test40: Wallet;
+  test41: Wallet;
+  test42: Wallet;
+  test43: Wallet;
+  test44: Wallet;
+  test45: Wallet;
+  test46: Wallet;
+  test47: Wallet;
+  test48: Wallet;
+  test49: Wallet;
+  test50: Wallet;
   all: Wallet[];
   players: Wallet[];
 }
@@ -193,6 +225,22 @@ export function loadWallets(): Wallets {
     test32: walletArray[39]!,
     test33: walletArray[40]!,
     test34: walletArray[41]!,
+    test35: walletArray[42]!,
+    test36: walletArray[43]!,
+    test37: walletArray[44]!,
+    test38: walletArray[45]!,
+    test39: walletArray[46]!,
+    test40: walletArray[47]!,
+    test41: walletArray[48]!,
+    test42: walletArray[49]!,
+    test43: walletArray[50]!,
+    test44: walletArray[51]!,
+    test45: walletArray[52]!,
+    test46: walletArray[53]!,
+    test47: walletArray[54]!,
+    test48: walletArray[55]!,
+    test49: walletArray[56]!,
+    test50: walletArray[57]!,
     all: walletArray,
     players: [walletArray[3]!, walletArray[4]!, walletArray[5]!, walletArray[6]!, walletArray[7]!],
   };
