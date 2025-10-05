@@ -402,11 +402,6 @@ async function main() {
   const aliceWs = await connectToClearNode(SEPOLIA_CONFIG.clearNodeUrl);
   await authenticateClearNode(aliceWs, alice);
 
-  // withdraw 0.3 USDC from test10
-  await withdraw(test10);
-
-  return
-
   try {
     // Step 1: Ensure channel exists
     const channelId = await ensureChannel(test10Ws, test10, tracker);

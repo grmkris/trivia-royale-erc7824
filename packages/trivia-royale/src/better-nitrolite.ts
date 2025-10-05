@@ -10,10 +10,11 @@ import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import type { State } from "@erc7824/nitrolite";
 import fs from "fs";
+import { logTxSubmitted } from "./utils/logger";
 
 type BetterNitroliteClient = {
   /**
-   * 
+   *
    * @returns balances in custody contract, channel, ledger, and wallet
    */
   getBalances: () => Promise<{
@@ -60,7 +61,7 @@ type BetterNitroliteClient = {
     // TODO more methods if needed
 }
 
-type StateStorage = {
+export type StateStorage = {
   getChannelState: (channelId: Hex) => Promise<State[]>;
   appendChannelState: (channelId: Hex, state: State) => Promise<void>;
 };
@@ -70,10 +71,8 @@ const createInMemoryStateStorage = (): StateStorage => {
   return {
     getChannelState: async (channelId: Hex) => {
       const states = channelStates.get(channelId);
-      if (!states) {
-        throw new Error(`Channel state not found for channel ${channelId}`);
-      }
-      return states;
+      // Return empty array if no states yet instead of throwing
+      return states || [];
     },
     appendChannelState: async (channelId: Hex, state: State) => {
       const states = channelStates.get(channelId);
@@ -83,7 +82,7 @@ const createInMemoryStateStorage = (): StateStorage => {
       }
       states.push(state);
       channelStates.set(channelId, states);
-    },
+    }
   };
 };
 
@@ -99,8 +98,8 @@ const reviverBigInt = (key: string, value: any): any => {
   return value;
 };
 
-const createFileSystemStateStorage = (): StateStorage => {
-  const STATE_FILE = 'state.json';
+const createFileSystemStateStorage = (walletAddress: Address): StateStorage => {
+  const STATE_FILE = `state-${walletAddress}.json`;
 
   // Initialize file if it doesn't exist
   if (!fs.existsSync(STATE_FILE)) {
@@ -119,7 +118,30 @@ const createFileSystemStateStorage = (): StateStorage => {
       }
       data[channelId].push(state);
       fs.writeFileSync(STATE_FILE, JSON.stringify(data, replacerBigInt, 2));
-    },
+    }
+  };
+};
+
+
+const createMessageHandler = (props: {
+  client: NitroliteClient,
+  stateStorage: StateStorage,
+  wallet: Wallet
+}) => {
+  return async (event: MessageEvent) => {
+    const response = parseAnyRPCResponse(event.data);
+    switch (response.method) {
+      case RPCMethod.CreateAppSession:
+        // TODO handle resize channel response
+        console.log(`Received resize channel response:`, response.params);
+        break;
+      case RPCMethod.Error:
+        console.error('ClearNode error:', response.params);
+        break;
+      default:
+        console.log(`Received message:`, response);
+        break;
+    }
   };
 };
 
@@ -140,20 +162,25 @@ export const createBetterNitroliteClient = (props: {
     },
     chainId: SEPOLIA_CONFIG.chainId,
   });
-  const stateStorage = createFileSystemStateStorage();
+  const stateStorage = createInMemoryStateStorage();
 
   let status: 'connected' | 'disconnected' | 'error' = 'disconnected';
   let ws: WebSocket | null = null;
+  const handleMessage = createMessageHandler({ client, stateStorage, wallet: props.wallet });
 
   const connect = async () => {
     ws = await connectToClearNode(SEPOLIA_CONFIG.clearNodeUrl);
-    await authenticateClearNode(ws, props.wallet);
+    await authenticateClearNode(ws, props.wallet, [{ asset: SEPOLIA_CONFIG.game.asset, amount: '1000000000000000000' }]);
     status = 'connected';
+    // setup listener
+    ws.addEventListener('message', handleMessage);
   };
 
   const disconnect = async () => {
     if (ws) {
       ws.close();
+      // remove listener
+      ws.removeEventListener('message', handleMessage);
       ws = null;
       status = 'disconnected';
     }
@@ -265,7 +292,7 @@ export const createBetterNitroliteClient = (props: {
             //   version: BigInt(firstProofState.version),
             // }];
 
-            const proofStates = (await stateStorage.getChannelState(channelId)).reverse();
+            const proofStates = await stateStorage.getChannelState(channelId);
             const parsedResponse = parseResizeChannelResponse(event.data);
             const { state, serverSignature } = parsedResponse.params;
             console.log(`Resize channel response:`, state, serverSignature, proofStates);
@@ -288,8 +315,11 @@ export const createBetterNitroliteClient = (props: {
             // get the state from the receipt
             const channelData2 = await client.getChannelData(channelId);
             console.log(`Channel data:`, channelData2);
-            console.log(`State from receipt:`, receipt.logs.find(log => log.address === SEPOLIA_CONFIG.contracts.custody)?.data);
+
+            // After successful resize, clear all stored states
+            // The resize is now on-chain, so we don't need any proof states for the next resize
             await stateStorage.appendChannelState(channelId, channelData2.lastValidState);
+            console.log(`  📝 Cleared proof states after successful on-chain resize v${channelData2.lastValidState.version}`);
             resolve();
           }
           else if (response.method === RPCMethod.Error) {
@@ -314,10 +344,185 @@ export const createBetterNitroliteClient = (props: {
     
   };
 
-  // Placeholder implementations for other methods
+  // Helper to resize channel with specific resize and allocate amounts
+  const resizeChannelWithAmounts = async (
+    channelId: Hex,
+    resizeAmount: bigint,    // custody ↔ channel movement (positive = custody → channel)
+    allocateAmount: bigint,  // channel ↔ ledger movement (negative = ledger → channel)
+  ): Promise<void> => {
+    if (!ws || status !== 'connected') {
+      throw new Error('WebSocket not connected');
+    }
+
+    const sessionSigner = createMessageSigner(
+      createWalletClient({
+        account: privateKeyToAccount(props.wallet.sessionPrivateKey),
+        chain: sepolia,
+        transport: http(),
+      })
+    );
+
+    // Create resize message
+    const message = await createResizeChannelMessage(sessionSigner, {
+      channel_id: channelId,
+      resize_amount: resizeAmount,
+      allocate_amount: allocateAmount,
+      funds_destination: props.wallet.address,
+    });
+
+    // Send and wait for response
+    return new Promise<void>((resolve, reject) => {
+      const handleMessage = async (event: MessageEvent) => {
+        try {
+          const response = parseAnyRPCResponse(event.data);
+
+          if (response.method === RPCMethod.ResizeChannel) {
+            ws!.removeEventListener('message', handleMessage);
+
+            const proofStates = await stateStorage.getChannelState(channelId);
+
+            const parsedResponse = parseResizeChannelResponse(event.data);
+            const { state, serverSignature } = parsedResponse.params;
+
+            console.log(`Resize channel response:`, {state, serverSignature, proofStates});
+            // Submit resize transaction
+            const txHash = await client.resizeChannel({
+              resizeState: {
+                channelId,
+                intent: state.intent,
+                version: BigInt(state.version),
+                data: state.stateData,
+                allocations: state.allocations,
+                serverSignature,
+              },
+              proofStates,
+            });
+
+            const receipt = await client.publicClient.waitForTransactionReceipt({ hash: txHash });
+
+            // After successful resize, append the new state
+            const channelData1 = await client.getChannelData(channelId);
+            console.log(`Channel data:`, channelData1);
+            await stateStorage.appendChannelState(channelId, channelData1.lastValidState);
+
+            resolve();
+          }
+          else if (response.method === RPCMethod.Error) {
+            ws!.removeEventListener('message', handleMessage);
+            console.error('ClearNode error:', response.params);
+            reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
+          }
+        } catch (error) {
+          console.error('Error parsing resize response:', error);
+          reject(new Error('Error parsing resize response'));
+        }
+      };
+
+      const timeoutId = setTimeout(() => {
+        ws!.removeEventListener('message', handleMessage);
+        reject(new Error('Timeout waiting for resize response'));
+      }, 60000);
+
+      ws!.addEventListener('message', handleMessage);
+      ws!.send(message);
+    });
+  };
+
   const withdraw = async (amount: bigint): Promise<void> => {
-    // TODO: Implement withdrawal logic
-    throw new Error("withdraw not implemented yet");
+    if (!ws || status !== 'connected') {
+      throw new Error('Not connected to ClearNode');
+    }
+
+    console.log(`\n💸 Withdrawing ${formatUSDC(amount)} USDC...`);
+
+    // Get current balances
+    const balances = await getBalances();
+
+    // Total available = channel + ledger + custody
+    const totalAvailable = balances.channel + balances.ledger + balances.custodyContract;
+
+    if (amount > totalAvailable) {
+      throw new Error(
+        `Insufficient funds. Requested ${formatUSDC(amount)}, ` +
+        `available ${formatUSDC(totalAvailable)} ` +
+        `(channel: ${formatUSDC(balances.channel)}, ` +
+        `ledger: ${formatUSDC(balances.ledger)}, ` +
+        `custody: ${formatUSDC(balances.custodyContract)})`
+      );
+    }
+
+    // If funds are in channel or ledger, need to handle them
+    if (balances.channel > 0n || balances.ledger > 0n) {
+      const channelId = await getChannelWithBroker(
+        ws,
+        props.wallet,
+        SEPOLIA_CONFIG.contracts.brokerAddress as Address
+      );
+
+      if (channelId) {
+        // Calculate total funds to drain
+        const totalToDrain = balances.channel + balances.ledger;
+
+        console.log(`  💰 Draining channel: ${formatUSDC(totalToDrain)} USDC`);
+        console.log(`     • Channel balance: ${formatUSDC(balances.channel)}`);
+        console.log(`     • Ledger balance: ${formatUSDC(balances.ledger)}`);
+
+        // To drain the channel completely, we need to handle two cases:
+
+        if (balances.ledger !== 0n) {
+          // If we have a ledger balance, we need to do a resize that:
+          // 1. Allocates the ledger balance to the channel
+          // 2. Then moves everything to custody
+          // Based on e2e-flow.ts pattern: both values negative when moving ledger→channel→custody
+          const resizeAmount = -(balances.channel + balances.ledger);
+          const allocateAmount = balances.ledger;
+
+          console.log(`  📊 Resize parameters:`);
+          console.log(`     • resize_amount: ${resizeAmount} (drain to custody)`);
+          console.log(`     • allocate_amount: ${allocateAmount} (ledger allocation)`);
+
+          await resizeChannelWithAmounts(channelId, resizeAmount, allocateAmount);
+        } else {
+          // If no ledger balance, just drain the channel to custody
+          console.log(`  📊 No ledger balance, draining channel only`);
+          await resizeChannelWithAmounts(channelId, -balances.channel, 0n);
+        }
+        console.log(`  ✅ Channel drained to custody`);
+
+        // Small delay to ensure state is updated
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Now close the empty channel
+        console.log(`  🔒 Closing empty channel...`);
+        const { closeChannelViaRPC } = await import('./utils/clearnode');
+        await closeChannelViaRPC(ws, props.wallet, channelId);
+
+        // Wait for close to settle
+        console.log(`  ⏳ Waiting for channel close to settle...`);
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
+
+    // Now withdraw from custody to wallet
+    const finalCustodyBalance = await client.getAccountBalance(
+      SEPOLIA_CONFIG.contracts.tokenAddress as Address
+    );
+
+    if (finalCustodyBalance > 0n) {
+      const withdrawAmount = amount > finalCustodyBalance ? finalCustodyBalance : amount;
+      console.log(`  💰 Withdrawing ${formatUSDC(withdrawAmount)} from custody to wallet...`);
+
+      const txHash = await client.withdrawal(
+        SEPOLIA_CONFIG.contracts.tokenAddress as Address,
+        withdrawAmount
+      );
+
+      logTxSubmitted('Withdrawal', txHash);
+      await client.publicClient.waitForTransactionReceipt({ hash: txHash });
+      console.log(`  ✅ Withdrawal complete!`);
+    } else {
+      console.log(`  ℹ️ No funds in custody to withdraw`);
+    }
   };
 
   const deposit = async (amount: bigint): Promise<void> => {
@@ -417,15 +622,30 @@ export const createBetterNitroliteClient = (props: {
     if (totalResizeAmount > 0n) {
       // Get proof states for resize
       const proofStates = await stateStorage.getChannelState(channelId);
-      console.log(`  📚 Using ${proofStates.length} proof state(s) for resize`, proofStates);
+      console.log(`  📚 Using ${proofStates.length} proof state(s) for resize`);
       await resizeChannelWithCustodyFunds(channelId, totalResizeAmount);
       console.log(`✅ Added ${formatUSDC(totalResizeAmount)} USDC to channel`);
     }
   };
 
-  const send = async (props: { to: Address; amount: bigint }): Promise<void> => {
-    // TODO: Implement send logic
-    throw new Error("send not implemented yet");
+  const send = async (params: { to: Address; amount: bigint }): Promise<void> => {
+    if (!ws || status !== 'connected') {
+      throw new Error('Not connected to ClearNode');
+    }
+
+    // Import transferViaLedger function
+    const { transferViaLedger } = await import('./utils/clearnode');
+    const { formatUSDC } = await import('./utils/erc20');
+
+    await transferViaLedger(
+      ws,
+      props.wallet,
+      params.to,
+      formatUSDC(params.amount),
+      SEPOLIA_CONFIG.game.asset
+    );
+
+    console.log(`  ✅ Sent ${formatUSDC(params.amount)} USDC to ${params.to.slice(0, 10)}...`);
   };
 
   return {

@@ -37,6 +37,17 @@ const WALLET_NAMES = [
   'Test21',    // index 28 - Test21 wallet (clean slate for e2e tests)
   'Test22',    // index 29 - Test22 wallet (clean slate for e2e tests)
   'Test23',    // index 30 - Test23 wallet (clean slate for e2e tests)
+  'Test24',    // index 31 - Test24 wallet (clean slate for e2e tests)
+  'Test25',    // index 32 - Test25 wallet (clean slate for e2e tests)
+  'Test26',    // index 33 - Test26 wallet (clean slate for e2e tests)
+  'Test27',    // index 34 - Test27 wallet (clean slate for e2e tests)
+  'Test28',    // index 35 - Test28 wallet (clean slate for e2e tests)
+  'Test29',    // index 36 - Test29 wallet (clean slate for e2e tests)
+  'Test30',    // index 37 - Test30 wallet (clean slate for e2e tests)
+  'Test31',    // index 38 - Test31 wallet (clean slate for e2e tests)
+  'Test32',    // index 39 - Test32 wallet (clean slate for e2e tests)
+  'Test33',    // index 40 - Test33 wallet (clean slate for e2e tests)
+  'Test34',    // index 41 - Test34 wallet (clean slate for e2e tests)
 ] as const;
 
 export interface Wallet {
@@ -86,6 +97,17 @@ export interface Wallets {
   test21: Wallet;
   test22: Wallet;
   test23: Wallet;
+  test24: Wallet;
+  test25: Wallet;
+  test26: Wallet;
+  test27: Wallet;
+  test28: Wallet;
+  test29: Wallet;
+  test30: Wallet;
+  test31: Wallet;
+  test32: Wallet;
+  test33: Wallet;
+  test34: Wallet;
   all: Wallet[];
   players: Wallet[];
 }
@@ -160,6 +182,17 @@ export function loadWallets(): Wallets {
     test21: walletArray[28]!,
     test22: walletArray[29]!,
     test23: walletArray[30]!,
+    test24: walletArray[31]!,
+    test25: walletArray[32]!,
+    test26: walletArray[33]!,
+    test27: walletArray[34]!,
+    test28: walletArray[35]!,
+    test29: walletArray[36]!,
+    test30: walletArray[37]!,
+    test31: walletArray[38]!,
+    test32: walletArray[39]!,
+    test33: walletArray[40]!,
+    test34: walletArray[41]!,
     all: walletArray,
     players: [walletArray[3]!, walletArray[4]!, walletArray[5]!, walletArray[6]!, walletArray[7]!],
   };

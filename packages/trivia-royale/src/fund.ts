@@ -130,6 +130,17 @@ async function main() {
   const test21 = wallets.test21;
   const test22 = wallets.test22;
   const test23 = wallets.test23;
+  const test24 = wallets.test24;
+  const test25 = wallets.test25;
+  const test26 = wallets.test26;
+  const test27 = wallets.test27;
+  const test28 = wallets.test28;
+  const test29 = wallets.test29;
+  const test30 = wallets.test30;
+  const test31 = wallets.test31;
+  const test32 = wallets.test32;
+  const test33 = wallets.test33;
+  const test34 = wallets.test34;
   const publicClient = createPublicRpcClient();
 
   // Check funding wallet balances
@@ -145,11 +156,11 @@ async function main() {
   const walletNames = process.argv.slice(2);
 
   // All possible recipients (before filtering)
-  // Gas recipients: Broker + Server + 5 Players + Test-Test23 = 30 wallets
-  let gasRecipients = [broker, server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23];
+  // Gas recipients: Broker + Server + 5 Players + Test-Test34 = 41 wallets
+  let gasRecipients = [broker, server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34];
 
-  // Game recipients: Server + 5 Players + Test-Test23 = 29 wallets (Broker doesn't need USDC)
-  let gameRecipients = [server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23];
+  // Game recipients: Server + 5 Players + Test-Test34 = 40 wallets (Broker doesn't need USDC)
+  let gameRecipients = [server, ...players, test, test2, test3, test4, test5, test6, test7, test8, test9, test10, test11, test12, test13, test14, test15, test16, test17, test18, test19, test20, test21, test22, test23, test24, test25, test26, test27, test28, test29, test30, test31, test32, test33, test34];
 
   // Apply filter if wallet names provided
   if (walletNames.length > 0) {

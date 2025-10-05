@@ -32,9 +32,7 @@ import {
   convertRPCToClientState,
   RPCMethod,
   type CreateChannelRequestParams,
-  type UnsignedState,
   RPCChannelStatus,
-  RPCChannelUpdate,
   parseChannelUpdateResponse,
   type State,
 } from '@erc7824/nitrolite';
@@ -46,6 +44,8 @@ import { createNitroliteClient } from './channels';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { parseUSDC, ensureAllowance } from './erc20';
+import type { StateStorage } from '../better-nitrolite';
+import { logTxSubmitted } from './logger';
 
 /**
  * Connect and authenticate all participants to ClearNode
@@ -86,7 +86,7 @@ export async function createChannelViaRPC(
   ws: WebSocket,
   wallet: Wallet,
   amount: string = '10', // Default amount in USDC
-  stateStorage?: { appendChannelState: (channelId: Hex, state: State) => Promise<void> }
+  stateStorage: StateStorage
 ): Promise<Hex> {
   return new Promise(async (resolve, reject) => {
     try {
@@ -402,7 +402,7 @@ export async function closeChannelViaRPC(
                 stateData: state.stateData as Hex,
               });
 
-              console.log(`  📤 ${wallet.name}: Close tx submitted (${txHash.slice(0, 10)}...)`);
+              logTxSubmitted(`${wallet.name}: Channel close`, txHash);
 
               await nitroliteClient.publicClient.waitForTransactionReceipt({ hash: txHash });
 

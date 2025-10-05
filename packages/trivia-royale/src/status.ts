@@ -13,7 +13,7 @@
  *   bun run status server    # Show only Server
  */
 
-import { loadWallets, createPublicRpcClient, type Wallet } from './utils/wallets';
+import { loadWallets, type Wallet } from './utils/wallets';
 import { NitroliteClient, ChannelStatus } from '@erc7824/nitrolite';
 import { SEPOLIA_CONFIG } from './utils/contracts';
 import { connectToClearNode, authenticateClearNode } from './yellow-integration';
@@ -33,7 +33,6 @@ async function main() {
   console.log(`💎 USDC Token: ${SEPOLIA_CONFIG.contracts.tokenAddress}\n`);
 
   const wallets = loadWallets();
-  const publicClient = createPublicRpcClient();
 
   // Parse filter argument (e.g., "alice", "bob1", "server")
   const filterName = process.argv[2]?.toLowerCase();
@@ -80,6 +79,17 @@ async function main() {
       case 'Test21': return '🌀';
       case 'Test22': return '🎆';
       case 'Test23': return '🎇';
+      case 'Test24': return '🎨';
+      case 'Test25': return '🎭';
+      case 'Test26': return '🎪';
+      case 'Test27': return '🎬';
+      case 'Test28': return '🎤';
+      case 'Test29': return '🎧';
+      case 'Test30': return '🎮';
+      case 'Test31': return '🎯';
+      case 'Test32': return '🎲';
+      case 'Test33': return '🎰';
+      case 'Test34': return '🎱';
       default: return '👤';
     }
   };
@@ -93,7 +103,7 @@ async function main() {
   console.log('├───┼──────────┼────────────────────────────────────────────┼──────────────┼──────────────┤');
 
   for (const wallet of walletsToShow) {
-    const ethBalance = await publicClient.getBalance({ address: wallet.address });
+    const ethBalance = await wallet.publicClient.getBalance({ address: wallet.address });
     const usdcBalance = await getUSDCBalance(wallet);
 
     const icon = getRoleIcon(wallet.name);
@@ -166,9 +176,9 @@ async function main() {
       // Create read-only NitroliteClient
       const client = new NitroliteClient({
         // @ts-expect-error - wallet.client is a WalletClient
-        publicClient,
+        publicClient: wallet.publicClient,
         // @ts-expect-error - wallet.client is a WalletClient
-        walletClient: wallet.client,
+        walletClient: wallet.walletClient,
         stateSigner: null as any, // Not needed for read operations
         challengeDuration: 3600n,
         addresses: {
@@ -187,7 +197,7 @@ async function main() {
       const ws = await connectToClearNode(SEPOLIA_CONFIG.clearNodeUrl);
       const brokerChannel = await getChannelWithBroker(ws, wallet, wallet.address);
       if (brokerChannel) {
-      console.log(`│  🏦 Broker Channel: ${brokerChaxnnel}`);
+      console.log(`│  🏦 Broker Channel: ${brokerChannel}`);
         const channelData = await client.getChannelData(brokerChannel);
         console.log(`│  🏦 Channel Data: ${channelData.channel.nonce}`);  
       }

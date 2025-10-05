@@ -10,6 +10,7 @@ import { parseUnits, formatUnits, type Address, type Hash } from 'viem';
 import { SEPOLIA_CONFIG } from './contracts';
 import type { Wallet } from './wallets';
 import { createPublicRpcClient } from './wallets';
+import { logTxSubmitted } from './logger';
 
 /**
  * Parse USDC amount (6 decimals) to wei
@@ -71,7 +72,7 @@ export async function ensureAllowance(
       amount
     );
 
-    console.log(`  ✅ ${wallet.name}: Approval tx ${txHash.slice(0, 10)}... submitted`);
+    logTxSubmitted(`${wallet.name}: USDC approval`, txHash);
 
     // Wait for confirmation
     const publicClient = createPublicRpcClient();
