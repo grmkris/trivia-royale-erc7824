@@ -1,0 +1,10 @@
+{
+  "title": "Building Blocks",
+  "pages": [
+    "index",
+    "fund-management",
+    "distributed-sessions",
+    "typed-messaging",
+    "session-lifecycle"
+  ]
+}

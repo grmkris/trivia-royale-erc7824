@@ -1,0 +1,88 @@
+---
+title: Building Blocks
+description: Practical patterns for common Yellow SDK operations
+---
+
+# Building Blocks
+
+Now that you understand the core concepts, these guides show you **how to implement common patterns** in your applications. Each building block is a standalone technique you'll use repeatedly.
+
+## The Essential Patterns
+
+<Cards>
+  <Card
+    title="Fund Management"
+    description="Complete deposit, withdraw, and resize flows with balance verification"
+    href="/trivia-royale/building-blocks/fund-management"
+  />
+  <Card
+    title="Distributed Sessions"
+    description="The prepare → sign → collect → create pattern for multi-party coordination"
+    href="/trivia-royale/building-blocks/distributed-sessions"
+  />
+  <Card
+    title="Typed Messaging"
+    description="Type-safe message schemas with TypeScript for robust communication"
+    href="/trivia-royale/building-blocks/typed-messaging"
+  />
+  <Card
+    title="Session Lifecycle"
+    description="Managing active sessions, auto-joining, and cleanup"
+    href="/trivia-royale/building-blocks/session-lifecycle"
+  />
+</Cards>
+
+## When to Use Each
+
+### Fund Management
+**Use when**: Moving value in or out of the system
+- Initial user onboarding (deposit)
+- Cashing out winnings (withdraw)
+- Rebalancing channel capacity
+- Peer-to-peer payments
+
+### Distributed Sessions
+**Use when**: Creating multi-party applications
+- Multiplayer games
+- Multi-party contracts
+- Collaborative applications
+- Tournament brackets
+
+### Typed Messaging
+**Use when**: Defining application communication
+- Any session-based application
+- Real-time games
+- Chat applications
+- Auction systems
+
+### Session Lifecycle
+**Use when**: Managing application state
+- Tracking active games/sessions
+- Cleaning up after completion
+- Handling disconnections
+- Managing UI state
+
+## Learning Path
+
+If you're building a **simple payment app**, focus on:
+1. Fund Management
+2. (Skip sessions)
+
+If you're building a **peer-to-peer game**, focus on:
+1. Fund Management (to get funds in)
+2. Distributed Sessions (to coordinate players)
+3. Typed Messaging (for game logic)
+4. Session Lifecycle (for cleanup)
+
+If you're building a **multiplayer server-authoritative game**, focus on:
+1. Fund Management
+2. Distributed Sessions
+3. Typed Messaging
+4. Session Lifecycle
+
+## Next Steps
+
+After mastering the building blocks, see them in action:
+- **[Simple Payment](../patterns/simple-payment)**: Fund management only
+- **[Ping-Pong](../patterns/ping-pong)**: Sessions + messaging
+- **[Complete Game](../patterns/complete-game)**: All patterns together

@@ -1,0 +1,147 @@
+---
+title: Core Concepts
+description: Fundamental concepts for building state channel applications
+---
+
+# Core Concepts
+
+Before diving into code, it's essential to understand the fundamental architecture of Yellow SDK applications. These concepts form the foundation that all patterns and examples build upon.
+
+## The Three Pillars
+
+State channel applications with Yellow SDK rest on three core concepts:
+
+<Cards>
+  <Card
+    title="The Balance Model"
+    description="Understanding the 4-layer balance system: wallet, custody, channel, and ledger"
+    href="/trivia-royale/core-concepts/balance-model"
+  />
+  <Card
+    title="Application Sessions"
+    description="Isolated instances where participants interact with instant, gasless transactions"
+    href="/trivia-royale/core-concepts/sessions"
+  />
+  <Card
+    title="Message Flow"
+    description="How clients communicate asynchronously through the ClearNode broker"
+    href="/trivia-royale/core-concepts/message-flow"
+  />
+</Cards>
+
+## Why These Matter
+
+### 1. The Balance Model
+
+Understanding the balance model is **critical** because:
+- You need to know where your funds are at all times
+- Different operations require funds in different layers
+- Withdrawals must traverse all layers in reverse
+- Ledger balances can be negative (debiting channel capacity)
+
+**Start here**: [The Balance Model](./balance-model)
+
+### 2. Application Sessions
+
+Sessions are how you build applications because:
+- They provide isolation between different interactions
+- They define who can participate and how much they stake
+- They enable typed, broadcast messaging between participants
+- They handle fund distribution when interactions complete
+
+**Read next**: [Application Sessions](./sessions)
+
+### 3. Message Flow
+
+Message flow architecture matters because:
+- It determines how your application responds to events
+- It affects message ordering and timing
+- It requires handling your own message broadcasts
+- It enables auto-joining sessions and state synchronization
+
+**Complete with**: [Message Flow](./message-flow)
+
+## The Mental Model
+
+Here's how the pieces fit together:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ YOUR APPLICATION                                            │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Player 1   │  │   Player 2   │  │    Server    │     │
+│  │   Client     │  │   Client     │  │   Client     │     │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
+│         │                  │                  │             │
+│         └──────────────────┼──────────────────┘             │
+│                            │                                │
+│                      WebSocket                              │
+│                            │                                │
+└────────────────────────────┼────────────────────────────────┘
+                             ↓
+                    ┌────────────────┐
+                    │   ClearNode    │  ← Message broker
+                    │   (Broker)     │
+                    └────────┬───────┘
+                             │
+                    Broadcast messages
+                    Manage sessions
+                             │
+                             ↓
+┌────────────────────────────┼────────────────────────────────┐
+│ BALANCE LAYERS                                              │
+│                            │                                │
+│  Wallet → Custody → Channel → Ledger                        │
+│    ↑        ↑         ↑         ↑                           │
+│    │        │         │         └─ Off-chain balance        │
+│    │        │         └─ Channel capacity                   │
+│    │        └─ On-chain escrow                              │
+│    └─ Your ERC-20 balance                                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Learning Path
+
+We recommend reading the core concepts in this order:
+
+1. **[The Balance Model](./balance-model)** (15 min read)
+   - Understand where funds live and how they move
+   - Learn about wallet, custody, channel, and ledger
+   - See complete deposit and withdrawal flows
+
+2. **[Application Sessions](./sessions)** (10 min read)
+   - Learn what sessions are and why they exist
+   - Understand participants, allocations, and weights
+   - See the complete session lifecycle
+
+3. **[Message Flow](./message-flow)** (10 min read)
+   - Understand the ClearNode broadcast architecture
+   - Learn about typed message schemas
+   - See message handler patterns
+
+## After Core Concepts
+
+Once you've internalized these concepts, you're ready for:
+
+- **[Building Blocks](/trivia-royale/building-blocks)** - Practical patterns for common tasks
+- **[Patterns](/trivia-royale/patterns)** - Complete examples you can adapt
+- **[Quick Start](/quick-start)** - Official SDK guides
+
+## Common Misconceptions
+
+### "The balance model is too complex"
+It seems complex at first, but each layer serves a specific purpose. Once you understand the topology, operations make logical sense.
+
+### "I can just use ledger balances"
+Ledger is backed by channel capacity. You need to understand the full stack to handle deposits, withdrawals, and edge cases.
+
+### "Sessions are like HTTP requests"
+Sessions are more like WebSocket rooms - they're long-lived, stateful, and support bidirectional messaging between multiple participants.
+
+### "Messages are peer-to-peer"
+All messages go through the ClearNode broker. This enables broadcasting, persistence, and protocol-level features.
+
+## Next Steps
+
+Start with **[The Balance Model](./balance-model)** - it's the foundation everything else builds on.

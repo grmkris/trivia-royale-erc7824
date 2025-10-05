@@ -2,6 +2,7 @@
   "title": "Documentation",
   "pages": [
     "index",
+    "trivia-royale",
     "erc-7824",
     "guides",
     "quick-start",

@@ -40,7 +40,7 @@ export interface SessionInvite {
   };
 }
 
-type BetterNitroliteClient<T extends MessageSchema = any> = {
+export type BetterNitroliteClient<T extends MessageSchema = any> = {
   /**
    *
    * @returns balances in custody contract, channel, ledger, and wallet

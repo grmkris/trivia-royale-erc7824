@@ -1,9 +1,12 @@
 {
   "name": "@trivia-royale/game",
   "version": "0.1.0",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "test": "bun run src/game.test.ts",
     "test:client": "bun run src/client.test.ts",

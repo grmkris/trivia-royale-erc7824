@@ -1,0 +1,10 @@
+{
+  "title": "Patterns & Examples",
+  "pages": [
+    "index",
+    "simple-payment",
+    "ping-pong",
+    "complete-game",
+    "error-handling"
+  ]
+}

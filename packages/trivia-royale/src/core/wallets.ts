@@ -1,4 +1,4 @@
-import { mnemonicToAccount, generateMnemonic, english } from 'viem/accounts';
+import { mnemonicToAccount, generateMnemonic, english, privateKeyToAccount } from 'viem/accounts';
 import type { Account, WalletClient, Chain, Transport, ParseAccount, PublicClient, Address } from 'viem';
 import { createWalletClient, createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
@@ -145,6 +145,38 @@ export interface Wallets {
   test50: Wallet;
   all: Wallet[];
   players: Wallet[];
+}
+
+/**
+ * Create a wallet from a private key
+ *
+ * Useful for backends that manage their own keys
+ */
+export function createWallet(privateKey: `0x${string}`): Wallet {
+  const account = privateKeyToAccount(privateKey);
+  const walletClient = createWalletClient({
+    account,
+    chain: sepolia,
+    transport: http(),
+  });
+  const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: http(),
+  });
+
+  // Generate ephemeral session keypair for ClearNode operations
+  const sessionKeypair = generateSessionKeypair();
+
+  return {
+    name: 'backend',
+    index: -1,
+    account,
+    walletClient,
+    publicClient,
+    address: account.address,
+    sessionPrivateKey: sessionKeypair.privateKey,
+    sessionAddress: sessionKeypair.address,
+  };
 }
 
 /**

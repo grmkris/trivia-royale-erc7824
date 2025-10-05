@@ -38,6 +38,14 @@
         "unist-util-visit": "^5.0.0",
       },
     },
+    "apps/server": {
+      "name": "server",
+      "version": "0.1.0",
+      "dependencies": {
+        "@trivia-royale/game": "workspace:*",
+        "hono": "^4.8.0",
+      },
+    },
     "apps/web": {
       "name": "web",
       "version": "0.1.0",
@@ -45,6 +53,7 @@
         "@erc7824/nitrolite": "^0.3.0",
         "@tanstack/react-form": "^1.23.5",
         "@tanstack/react-query": "^5.90.2",
+        "@trivia-royale/game": "workspace:*",
         "@wagmi/connectors": "^5.11.2",
         "@wagmi/core": "^2.21.2",
         "class-variance-authority": "^0.7.1",
@@ -1589,6 +1598,8 @@
     "scroll-into-view-if-needed": ["scroll-into-view-if-needed@3.1.0", "", { "dependencies": { "compute-scroll-into-view": "^3.0.2" } }, "sha512-49oNpRjWRvnU8NyGVmUaYG4jtTkNonFZI86MmGRDqBphEK2EXT9gdEUoQPZhuBM8yWHxCWbobltqYO5M4XrUvQ=="],
 
     "semver": ["semver@7.7.2", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA=="],
+
+    "server": ["server@workspace:apps/server"],
 
     "set-blocking": ["set-blocking@2.0.0", "", {}, "sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw=="],
 
