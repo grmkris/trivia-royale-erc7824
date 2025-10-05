@@ -21,7 +21,7 @@ describe('BetterNitrolite', () => {
 
     // Use test10 as main wallet (should have funds)
     // Use alice as sender (should have channel and can send)
-    const testWallet = wallets.test32;
+    const testWallet = wallets.test33;
     const sender = wallets.alice;
 
 
@@ -136,4 +136,12 @@ describe('BetterNitrolite', () => {
       await senderClient.disconnect();
     }
   }, 200000);
+
+
+  it('should handle app session', async () => {
+    const wallets = loadWallets();
+    const client = createBetterNitroliteClient({ wallet: wallets.test18 });
+    await client.connect();
+    await client.disconnect();
+  });
 });

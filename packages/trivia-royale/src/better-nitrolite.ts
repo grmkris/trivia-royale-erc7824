@@ -131,7 +131,7 @@ const createMessageHandler = (props: {
   return async (event: MessageEvent) => {
     const response = parseAnyRPCResponse(event.data);
     switch (response.method) {
-      case RPCMethod.CreateAppSession:
+      case RPCMethod.Message:
         // TODO handle resize channel response
         console.log(`Received resize channel response:`, response.params);
         break;
