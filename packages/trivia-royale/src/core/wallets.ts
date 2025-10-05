@@ -288,7 +288,9 @@ export function createNitroliteClient(
   const stateSigner = new SessionKeyStateSigner(wallet.sessionPrivateKey);
 
   return new NitroliteClient({
+    // @ts-expect-error - viem version mismatch between dependencies
     publicClient: wallet.publicClient,
+    // @ts-expect-error - viem version mismatch between dependencies
     walletClient: wallet.walletClient,
     stateSigner,
     challengeDuration: 3600n,

@@ -109,7 +109,7 @@ type BetterNitroliteClient<T extends MessageSchema = any> = {
    * @param signatures - Array of signatures from all participants
    * @returns Session ID
    */
-  createSession: (request: NitroliteRPCMessage, signatures: string[]) => Promise<Hex>;
+  createSession: (request: NitroliteRPCMessage, signatures: `0x${string}`[]) => Promise<Hex>;
   /**
    * Sends a message within an active session
    * @param sessionId - The session to send the message to
@@ -258,7 +258,7 @@ const createMessageHandler = <T extends MessageSchema>(props: {
 
             // Notify user if callback provided
             if (props.onSessionClosed) {
-              const finalAllocations = closeAppResponse.params.allocations || [];
+              const finalAllocations = (closeAppResponse.params as any).allocations || [];
               props.onSessionClosed(sessionId, finalAllocations);
             }
 
@@ -671,7 +671,7 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
 
         // Now close the empty channel
         console.log(`  🔒 Closing empty channel...`);
-        const { closeChannelViaRPC } = await import('./utils/clearnode');
+        const { closeChannelViaRPC } = await import('./rpc/channels');
         await closeChannelViaRPC(ws, props.wallet, channelId);
 
         // Wait for close to settle
@@ -869,7 +869,7 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     return signature;
   };
 
-  const createSession = async (request: NitroliteRPCMessage, signatures: string[]): Promise<Hex> => {
+  const createSession = async (request: NitroliteRPCMessage, signatures: `0x${string}`[]): Promise<Hex> => {
     if (!ws || status !== 'connected') {
       throw new Error('Not connected to ClearNode');
     }

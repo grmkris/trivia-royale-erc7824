@@ -7,6 +7,7 @@
 
 import { Erc20Service } from '@erc7824/nitrolite';
 import { parseUnits, formatUnits, type Address, type Hash } from 'viem';
+import { sepolia } from 'viem/chains';
 import { SEPOLIA_CONFIG } from './contracts';
 import type { Wallet } from './wallets';
 import { createPublicRpcClient } from './wallets';
@@ -31,6 +32,7 @@ export function formatUSDC(amount: bigint): string {
  */
 export function createErc20Service(wallet: Wallet): Erc20Service {
   const publicClient = createPublicRpcClient();
+  // @ts-expect-error - viem version mismatch between dependencies
   return new Erc20Service(wallet.publicClient, wallet.walletClient, wallet.account);
 }
 
@@ -114,7 +116,7 @@ export async function transferUSDC(
     functionName: 'transfer',
     args: [to, amountWei],
     account: fromWallet.account,
-    chain: SEPOLIA_CONFIG.chain,
+    chain: sepolia,
   });
 
   return hash;

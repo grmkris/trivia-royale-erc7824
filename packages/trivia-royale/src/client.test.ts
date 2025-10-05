@@ -154,7 +154,7 @@ describe('BetterNitrolite', () => {
     // Define message schema for game
     interface GameSchema extends MessageSchema {
       start_game: {
-        data: { round: number };
+        data: { round: number; from: string };
       };
       ping: {
         data: { from: string; timestamp: number };
@@ -281,7 +281,7 @@ describe('BetterNitrolite', () => {
     // IMPORTANT: Signature order must match createGameSessionWithMultiSig pattern:
     // 1. Server signature first
     // 2. Then player signatures in allocation order (only those with non-zero amounts)
-    const sessionId = await serverClient.createSession(sessionRequest, [sigServer, sig1, sig2]);
+    const sessionId = await serverClient.createSession(sessionRequest, [sigServer as `0x${string}`, sig1 as `0x${string}`, sig2 as `0x${string}`]);
 
     console.log(`   ✅ Session created: ${sessionId}\n`);
 

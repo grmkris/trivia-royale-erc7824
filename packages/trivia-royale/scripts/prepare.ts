@@ -38,6 +38,10 @@ function getBrokerPrivateKey(mnemonic: string): `0x${string}` {
     return `0x${hex}` as `0x${string}`;
   }
 
+  if (!privateKeyBytes) {
+    throw new Error('Failed to derive private key from mnemonic');
+  }
+
   return privateKeyBytes as `0x${string}`;
 }
 
@@ -106,7 +110,7 @@ async function main() {
 
   // Check funding wallet balances (both ETH and USDC)
   const ethBalance = await publicClient.getBalance({ address: funding.address });
-  const usdcBalance = await getUSDCBalance(funding, funding.address);
+  const usdcBalance = await getUSDCBalance(funding);
 
   console.log('💰 Funding Wallet:\n');
   console.log(`   Address: ${funding.address}`);

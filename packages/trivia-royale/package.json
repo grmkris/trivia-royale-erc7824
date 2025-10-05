@@ -9,10 +9,10 @@
     "test:client": "bun run src/client.test.ts",
     "test:game": "bun run src/game.test.ts",
     "typecheck": "tsc --noEmit",
-    "prepare": "bun run src/scripts/prepare.ts",
-    "fund": "bun run src/scripts/fund.ts",
-    "status": "bun run src/scripts/status.ts",
-    "cashout": "bun run src/scripts/cashout.ts"
+    "prepare": "bun run scripts/prepare.ts",
+    "fund": "bun run scripts/fund.ts",
+    "status": "bun run scripts/status.ts",
+    "cashout": "bun run scripts/cashout.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.2.23"

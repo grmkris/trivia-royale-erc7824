@@ -86,7 +86,12 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
 
         if (type === 'question') {
           const round = data.round as number;
-          const config = PLAYER_ANSWERS[player1.address][round - 1];
+          const config = PLAYER_ANSWERS[player1.address]?.[round - 1];
+
+          if (!config) {
+            console.error(`No answer config for player1 round ${round}`);
+            return;
+          }
 
           // Simulate thinking time
           setTimeout(async () => {
@@ -102,7 +107,10 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
           }, config.delay);
         } else if (type === 'round_result') {
           if (data.winner === player1.address) {
-            scores[player1.address] += 1;
+            const currentScore = scores[player1.address];
+            if (currentScore !== undefined) {
+              scores[player1.address] = currentScore + 1;
+            }
             console.log(`   🎉 Player 1 won round ${data.round}!`);
           }
         }
@@ -117,7 +125,12 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
 
         if (type === 'question') {
           const round = data.round as number;
-          const config = PLAYER_ANSWERS[player2.address][round - 1];
+          const config = PLAYER_ANSWERS[player2.address]?.[round - 1];
+
+          if (!config) {
+            console.error(`No answer config for player2 round ${round}`);
+            return;
+          }
 
           setTimeout(async () => {
             const timestamp = Date.now();
@@ -132,7 +145,10 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
           }, config.delay);
         } else if (type === 'round_result') {
           if (data.winner === player2.address) {
-            scores[player2.address] += 1;
+            const currentScore = scores[player2.address];
+            if (currentScore !== undefined) {
+              scores[player2.address] = currentScore + 1;
+            }
             console.log(`   🎉 Player 2 won round ${data.round}!`);
           }
         }
@@ -147,7 +163,12 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
 
         if (type === 'question') {
           const round = data.round as number;
-          const config = PLAYER_ANSWERS[player3.address][round - 1];
+          const config = PLAYER_ANSWERS[player3.address]?.[round - 1];
+
+          if (!config) {
+            console.error(`No answer config for player3 round ${round}`);
+            return;
+          }
 
           setTimeout(async () => {
             const timestamp = Date.now();
@@ -162,7 +183,10 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
           }, config.delay);
         } else if (type === 'round_result') {
           if (data.winner === player3.address) {
-            scores[player3.address] += 1;
+            const currentScore = scores[player3.address];
+            if (currentScore !== undefined) {
+              scores[player3.address] = currentScore + 1;
+            }
             console.log(`   🎉 Player 3 won round ${data.round}!`);
           }
         }
@@ -247,7 +271,7 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
 
     console.log(`   ✅ All participants signed`);
 
-    const sessionId = await serverClient.createSession(sessionRequest, [sigServer, sig1, sig2, sig3]);
+    const sessionId = await serverClient.createSession(sessionRequest, [sigServer as `0x${string}`, sig1 as `0x${string}`, sig2 as `0x${string}`, sig3 as `0x${string}`]);
 
     console.log(`   ✅ Session created: ${sessionId}\n`);
 
@@ -265,6 +289,11 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
     // Play each round
     for (let round = 1; round <= 3; round++) {
       const q = QUESTIONS[round - 1];
+
+      if (!q) {
+        console.error(`No question for round ${round}`);
+        continue;
+      }
 
       console.log(`   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
       console.log(`   📝 ROUND ${round}: ${q.question}`);
@@ -303,7 +332,12 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
         const winnerName = winner === player1.address ? 'Player 1'
                          : winner === player2.address ? 'Player 2'
                          : 'Player 3';
-        console.log(`\n   🏆 Winner: ${winnerName} (answered in ${correctAnswers[0].timestamp - answerSubmissions[0].timestamp}ms)\n`);
+
+        const firstCorrect = correctAnswers[0];
+        const firstAnswer = answerSubmissions[0];
+        if (firstCorrect && firstAnswer) {
+          console.log(`\n   🏆 Winner: ${winnerName} (answered in ${firstCorrect.timestamp - firstAnswer.timestamp}ms)\n`);
+        }
       } else {
         console.log(`\n   💀 No correct answers this round\n`);
       }
@@ -324,7 +358,11 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
       console.log(`   ${medal} ${name}: ${score} wins`);
     });
 
-    const finalWinner = sortedScores[0][0] as Address;
+    const firstPlace = sortedScores[0];
+    if (!firstPlace) {
+      throw new Error('No scores recorded');
+    }
+    const finalWinner = firstPlace[0] as Address;
 
     await serverClient.sendMessage(sessionId, 'game_over', {
       finalWinner,
@@ -358,10 +396,18 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
       third: (totalPot * 20n) / 100n,
     };
 
+    const firstPlaceAddr = sortedScores[0]?.[0];
+    const secondPlaceAddr = sortedScores[1]?.[0];
+    const thirdPlaceAddr = sortedScores[2]?.[0];
+
+    if (!firstPlaceAddr || !secondPlaceAddr || !thirdPlaceAddr) {
+      throw new Error('Not enough players in sorted scores');
+    }
+
     const finalAllocations = [
-      { participant: sortedScores[0][0] as Address, asset: 'USDC', amount: formatUSDC(prizes.first) },
-      { participant: sortedScores[1][0] as Address, asset: 'USDC', amount: formatUSDC(prizes.second) },
-      { participant: sortedScores[2][0] as Address, asset: 'USDC', amount: formatUSDC(prizes.third) },
+      { participant: firstPlaceAddr as Address, asset: 'USDC', amount: formatUSDC(prizes.first) },
+      { participant: secondPlaceAddr as Address, asset: 'USDC', amount: formatUSDC(prizes.second) },
+      { participant: thirdPlaceAddr as Address, asset: 'USDC', amount: formatUSDC(prizes.third) },
       { participant: server.address, asset: 'USDC', amount: '0' },
     ];
 
@@ -390,6 +436,8 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
 
     console.log('💸 Ledger Balance Changes:\n');
     Object.entries(changes).forEach(([addr, change]) => {
+      if (change === undefined) return;
+
       const name = addr === player1.address ? 'Player 1'
                  : addr === player2.address ? 'Player 2'
                  : 'Player 3';
@@ -398,7 +446,15 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
     });
 
     // Verify conservation of funds (sum of changes should be 0)
-    const totalChange = changes[player1.address] + changes[player2.address] + changes[player3.address];
+    const change1 = changes[player1.address];
+    const change2 = changes[player2.address];
+    const change3 = changes[player3.address];
+
+    if (change1 === undefined || change2 === undefined || change3 === undefined) {
+      throw new Error('Missing player balance changes');
+    }
+
+    const totalChange = change1 + change2 + change3;
     expect(totalChange).toBe(0n);
     console.log(`\n   ✅ Fund conservation verified (total change: ${totalChange})\n`);
 
