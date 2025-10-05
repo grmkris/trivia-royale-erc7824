@@ -1,5 +1,5 @@
 import { SEPOLIA_CONFIG } from "./utils/contracts";
-import { NitroliteClient, SessionKeyStateSigner, createResizeChannelMessage, parseResizeChannelResponse, parseAnyRPCResponse, RPCMethod } from "@erc7824/nitrolite";
+import { NitroliteClient, SessionKeyStateSigner, createResizeChannelMessage, parseResizeChannelResponse, parseAnyRPCResponse, RPCMethod, createCloseAppSessionMessage, parseMessageResponse } from "@erc7824/nitrolite";
 import type { Wallet } from "./utils/wallets";
 import type { Address, Chain, Hex } from "viem";
 import { connectToClearNode, authenticateClearNode, createMessageSigner } from "./yellow-integration";
@@ -14,7 +14,7 @@ import { logTxSubmitted } from "./utils/logger";
 import { createApplicationMessage } from '@erc7824/nitrolite';
 import { transferViaLedger } from './utils/clearnode';
 import { NitroliteRPC } from '@erc7824/nitrolite';
-
+import { z } from "zod";
 // Generic message schema for app sessions
 export interface MessageSchema {
   [key: string]: {
@@ -127,6 +127,19 @@ type BetterNitroliteClient<T extends MessageSchema = any> = {
    * Get list of active session IDs
    */
   getActiveSessions: () => Hex[];
+  /**
+   * Closes an active app session
+   * @param sessionId - The session to close
+   * @param finalAllocations - Final allocations for all participants
+   */
+  closeSession: (
+    sessionId: Hex,
+    finalAllocations: Array<{
+      participant: Address;
+      asset: string;
+      amount: string;
+    }>
+  ) => Promise<void>;
 }
 
 export type StateStorage = {
@@ -196,19 +209,46 @@ const createMessageHandler = <T extends MessageSchema>(props: {
   stateStorage: StateStorage,
   wallet: Wallet,
   onAppMessage?: MessageHandler<T>,
+  onSessionClosed?: (sessionId: Hex, finalAllocations: Array<{
+    participant: Address;
+    asset: string;
+    amount: string;
+  }>) => void,
+  activeSessions: Set<Hex>,
   ws: WebSocket | null,
 }) => {
   return async (event: MessageEvent) => {
     try {
       const response = parseAnyRPCResponse(event.data);
+      console.log('Received message1:', response);
       switch (response.method) {
         case RPCMethod.Message:
+          const MessageResponseSchema = z.object({
+            app_session_id: z.string(),
+            message: z.object({
+              type: z.string(),
+              data: z.unknown(),  
+            }),
+          });
+          const parsedSafe = MessageResponseSchema.safeParse(response.params);
+          if (!parsedSafe.success) {
+            // console.error('Invalid message response:', parsedSafe.error);
+            break;
+          }
+          const parsed = parsedSafe.data;
+          console.log('Received message2:', parsed);
           // Handle application messages
-          if (props.onAppMessage && response.params) {
-            const { appSessionId, message } = response.params;
-            if (message && appSessionId) {
+          if (props.onAppMessage && parsed) {
+            console.log('Received message3:', parsed);
+            const { app_session_id, message } = parsed;
+            if (message && app_session_id) {
               const messageType = message.type;
               const messageData = message.data || {};
+
+              // Auto-join session when receiving first message
+              if (!props.activeSessions.has(app_session_id)) {
+                props.activeSessions.add(app_session_id);
+              }
 
               // Create reply function if needed
               let replyFn: any = undefined;
@@ -221,13 +261,11 @@ const createMessageHandler = <T extends MessageSchema>(props: {
                       transport: http(),
                     })
                   );
-
-                  const { createApplicationMessage } = await import('@erc7824/nitrolite');
                   const replyMessage = await createApplicationMessage(
                     signer,
-                    appSessionId,
+                    app_session_id,
                     {
-                      type: `${messageType}_response`,
+                      type: `${message.type}_response`,
                       data: replyData,
                       inReplyTo: message.id,
                     }
@@ -237,9 +275,34 @@ const createMessageHandler = <T extends MessageSchema>(props: {
                 };
               }
 
+              console.log('messageType4:', messageType);
+
               // Call user's handler
-              await props.onAppMessage(messageType, appSessionId, messageData, replyFn);
+              await props.onAppMessage(messageType, app_session_id, messageData, replyFn);
             }
+          }
+          break;
+        case RPCMethod.CloseAppSession:
+          // Handle session close notifications
+          if (response.params?.appSessionId) {
+            const sessionId = response.params.appSessionId as Hex;
+
+            // Remove from active sessions
+            props.activeSessions.delete(sessionId);
+
+            // Notify user if callback provided
+            if (props.onSessionClosed) {
+              const finalAllocations = response.params.allocations || [];
+              props.onSessionClosed(sessionId, finalAllocations);
+            }
+
+            console.log(`  🔒 Session ${sessionId.slice(0, 10)}... closed (notified)`);
+          }
+          break;
+        case RPCMethod.CreateAppSession:
+          // Auto-join session when ClearNode broadcasts creation
+          if (response.params?.appSessionId) {
+            props.activeSessions.add(response.params.appSessionId as Hex);
           }
           break;
         case RPCMethod.Error:
@@ -260,6 +323,11 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
   sessionAllowance?: string; // Optional USDC amount to authorize for sessions (e.g., "0.001")
   onSessionInvite?: (invite: SessionInvite) => Promise<boolean>; // Handler for session invitations
   onAppMessage?: MessageHandler<T>; // Handler for application messages within sessions
+  onSessionClosed?: (sessionId: Hex, finalAllocations: Array<{
+    participant: Address;
+    asset: string;
+    amount: string;
+  }>) => void; // Handler for session closure notifications
 }): BetterNitroliteClient<T> => {
   const client = new NitroliteClient({
     // @ts-expect-error - wallet.publicClient is a PublicClient
@@ -289,6 +357,8 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     stateStorage,
     wallet: props.wallet,
     onAppMessage: props.onAppMessage,
+    onSessionClosed: props.onSessionClosed,
+    activeSessions,
     ws: null, // Will be updated when connected
   });
 
@@ -312,6 +382,8 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
       stateStorage,
       wallet: props.wallet,
       onAppMessage: props.onAppMessage,
+      onSessionClosed: props.onSessionClosed,
+      activeSessions,
       ws,
     });
 
@@ -911,6 +983,71 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     return Array.from(activeSessions);
   };
 
+  const closeSession = async (
+    sessionId: Hex,
+    finalAllocations: Array<{
+      participant: Address;
+      asset: string;
+      amount: string;
+    }>
+  ): Promise<void> => {
+    if (!ws || status !== 'connected') {
+      throw new Error('Not connected to ClearNode');
+    }
+
+    // Check if session is active
+    if (!activeSessions.has(sessionId)) {
+      throw new Error(`Session ${sessionId} is not active`);
+    }
+
+    console.log(`\n  🔒 Closing session ${sessionId.slice(0, 10)}...`);
+
+    const signer = createMessageSigner(
+      createWalletClient({
+        account: privateKeyToAccount(props.wallet.sessionPrivateKey),
+        chain: sepolia,
+        transport: http(),
+      })
+    );
+
+    const closeMsg = await createCloseAppSessionMessage(signer, {
+      app_session_id: sessionId,
+      allocations: finalAllocations,
+    });
+
+    return new Promise((resolve, reject) => {
+      const handleMessage = (event: MessageEvent) => {
+        try {
+          const response = parseAnyRPCResponse(event.data);
+
+          if (response.method === RPCMethod.CloseAppSession) {
+            ws!.removeEventListener('message', handleMessage);
+
+            // Remove from active sessions
+            activeSessions.delete(sessionId);
+
+            console.log(`  ✅ Session closed`);
+            resolve();
+          } else if (response.method === RPCMethod.Error) {
+            ws!.removeEventListener('message', handleMessage);
+            console.error('  ❌ ClearNode error:', response.params);
+            reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
+          }
+        } catch (error) {
+          // Ignore parsing errors, might be other messages
+        }
+      };
+
+      ws!.addEventListener('message', handleMessage);
+      ws!.send(closeMsg);
+
+      setTimeout(() => {
+        ws!.removeEventListener('message', handleMessage);
+        reject(new Error('Timeout waiting for session close'));
+      }, 30000);
+    });
+  };
+
   return {
     status: async () => status,
     connect,
@@ -924,5 +1061,6 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     createSession,
     sendMessage,
     getActiveSessions,
+    closeSession,
   };
 };

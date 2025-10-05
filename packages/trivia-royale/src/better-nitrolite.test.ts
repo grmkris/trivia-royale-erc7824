@@ -156,21 +156,84 @@ describe('BetterNitrolite', () => {
       start_game: {
         data: { round: number };
       };
+      ping: {
+        data: { from: string; timestamp: number };
+      };
+      pong: {
+        data: { from: string; replyTo: number };
+      };
     }
+
+    // Track session close notifications
+    const closeNotifications: { client: string; sessionId: string }[] = [];
+
+    // Track messages received by each client
+    const messagesReceived: { client: string; type: string; from: string; data: any }[] = [];
 
     // Create clients for each participant
     const client1 = createBetterNitroliteClient<GameSchema>({
       wallet: player1,
       sessionAllowance: '0.00001',
+      onAppMessage: async (type, sessionId, data) => {
+        // Players only care about pings and game events, not pongs
+        if (type === 'ping' || type === 'start_game') {
+          console.log(`   📬 Player 1 received '${String(type)}' message from ${data.from?.slice(0, 10)}...`);
+          messagesReceived.push({ client: 'player1', type: String(type), from: data.from, data });
+        }
+
+        // Auto-respond to ping with pong
+        if (type === 'ping') {
+          console.log(`   📤 Player 1 sending 'pong' response`);
+          await client1.sendMessage(sessionId, 'pong', {
+            from: player1.address,
+            replyTo: data.timestamp,
+          });
+        }
+      },
+      onSessionClosed: (sessionId) => {
+        console.log(`   📬 Player 1 received close notification for ${sessionId.slice(0, 10)}...`);
+        closeNotifications.push({ client: 'player1', sessionId });
+      },
     });
 
     const client2 = createBetterNitroliteClient<GameSchema>({
       wallet: player2,
       sessionAllowance: '0.00001',
+      onAppMessage: async (type, sessionId, data) => {
+        // Players only care about pings and game events, not pongs
+        if (type === 'ping' || type === 'start_game') {
+          console.log(`   📬 Player 2 received '${String(type)}' message from ${data.from?.slice(0, 10)}...`);
+          messagesReceived.push({ client: 'player2', type: String(type), from: data.from, data });
+        }
+
+        // Auto-respond to ping with pong
+        if (type === 'ping') {
+          console.log(`   📤 Player 2 sending 'pong' response`);
+          await client2.sendMessage(sessionId, 'pong', {
+            from: player2.address,
+            replyTo: data.timestamp,
+          });
+        }
+      },
+      onSessionClosed: (sessionId) => {
+        console.log(`   📬 Player 2 received close notification for ${sessionId.slice(0, 10)}...`);
+        closeNotifications.push({ client: 'player2', sessionId });
+      },
     });
 
     const serverClient = createBetterNitroliteClient<GameSchema>({
       wallet: server,
+      onAppMessage: async (type, sessionId, data) => {
+        // Server only cares about pong responses, not its own pings/start_game
+        if (type === 'pong') {
+          console.log(`   📬 Server received '${String(type)}' message from ${data.from?.slice(0, 10)}...`);
+          messagesReceived.push({ client: 'server', type: String(type), from: data.from, data });
+        }
+      },
+      onSessionClosed: (sessionId) => {
+        console.log(`   📬 Server received close notification for ${sessionId.slice(0, 10)}...`);
+        closeNotifications.push({ client: 'server', sessionId });
+      },
     });
 
     // Connect all clients
@@ -232,13 +295,102 @@ describe('BetterNitrolite', () => {
     console.log('📨 Step 4: Exchange messages in session\n');
 
     // Now they can exchange typed messages
-    await serverClient.sendMessage(sessionId, 'start_game', { round: 1 });
-    console.log('   ✅ Server sent start_game message\n');
+    await serverClient.sendMessage(sessionId, 'start_game', { round: 1, from: server.address });
+    console.log('   📤 Server sent start_game message\n');
 
     // Check active sessions
     const activeSessions = serverClient.getActiveSessions();
     expect(activeSessions).toContain(sessionId);
     console.log(`   ✅ Active sessions: ${activeSessions.length}\n`);
+
+    // Step 4a: Ping-Pong Test - Verify message broadcasting
+    console.log('🏓 Step 4a: Ping-Pong Message Broadcasting Test\n');
+
+    const pingTimestamp = Date.now();
+    console.log(`   📤 Server sending 'ping' to all participants...`);
+    await serverClient.sendMessage(sessionId, 'ping', {
+      from: server.address,
+      timestamp: pingTimestamp,
+    });
+
+    // Wait for responses to arrive
+    console.log(`   ⏳ Waiting for responses...\n`);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Analyze results
+    console.log('📊 Message Flow Analysis:\n');
+
+    const pings = messagesReceived.filter(m => m.type === 'ping');
+    const pongs = messagesReceived.filter(m => m.type === 'pong');
+    const startGames = messagesReceived.filter(m => m.type === 'start_game');
+
+    console.log(`   Start Game messages: ${startGames.length}`);
+    startGames.forEach(m => {
+      console.log(`     - ${m.client} received from ${m.from.slice(0, 10)}...`);
+    });
+
+    console.log(`\n   Ping messages: ${pings.length}`);
+    pings.forEach(m => {
+      console.log(`     - ${m.client} received from ${m.from.slice(0, 10)}...`);
+    });
+
+    console.log(`\n   Pong messages: ${pongs.length}`);
+    pongs.forEach(m => {
+      console.log(`     - ${m.client} received from ${m.from.slice(0, 10)}...`);
+    });
+
+    console.log(`\n   Total messages exchanged: ${messagesReceived.length}\n`);
+
+    // Verify broadcasting worked
+    expect(pings.length).toBe(2); // Both players should receive the ping
+    expect(pongs.length).toBe(2); // Server should receive both pongs
+    console.log('   ✅ Message broadcasting verified!\n');
+
+    // Step 5: Close the session
+    console.log('🔒 Step 5: Close session\n');
+
+    // In real app: server would determine final allocations based on game outcome
+    // For test: return all funds to original owners
+    const finalAllocations = [
+      { participant: player1.address, asset: 'USDC', amount: '0.0000001' },
+      { participant: player2.address, asset: 'USDC', amount: '0.0000001' },
+      { participant: server.address, asset: 'USDC', amount: '0' },
+    ];
+
+    await serverClient.closeSession(sessionId, finalAllocations);
+    console.log('   ✅ Session closed by server\n');
+
+    // Wait a bit for close notifications to propagate
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Verify all clients received close notification
+    console.log('📬 Verifying close notifications...\n');
+
+    // Note: ClearNode currently only notifies the requester (server)
+    // Players might not receive the notification unless ClearNode broadcasts it
+    console.log(`   Received ${closeNotifications.length} notification(s):`);
+    closeNotifications.forEach(n => {
+      console.log(`     - ${n.client}: ${n.sessionId.slice(0, 10)}...`);
+    });
+
+    // Verify session is removed from server's active sessions
+    const serverActiveSessions = serverClient.getActiveSessions();
+    expect(serverActiveSessions).not.toContain(sessionId);
+    console.log(`   ✅ Session removed from server's active sessions`);
+
+    // Check player sessions
+    const player1Sessions = client1.getActiveSessions();
+    const player2Sessions = client2.getActiveSessions();
+
+    if (closeNotifications.length === 3) {
+      // All participants were notified - verify all cleaned up
+      expect(player1Sessions).not.toContain(sessionId);
+      expect(player2Sessions).not.toContain(sessionId);
+      console.log(`   ✅ All participants cleaned up their sessions\n`);
+    } else {
+      // Only server was notified (current ClearNode behavior)
+      console.log(`   ℹ️  Note: Only server was notified (ClearNode doesn't broadcast close events)\n`);
+    }
 
     // Disconnect all
     console.log('🔌 Disconnecting all clients...');
@@ -251,7 +403,7 @@ describe('BetterNitrolite', () => {
 
     console.log('💡 Key Insight:');
     console.log('   Coordination happens outside the protocol (HTTP/WS/direct)');
-    console.log('   BetterNitroliteClient provides pure functions for session creation');
+    console.log('   BetterNitroliteClient provides pure functions for session lifecycle');
     console.log('   App developers choose their coordination mechanism\n');
   }, 60000);
 });
