@@ -10,9 +10,9 @@ import {
   loadWallets,
   createPublicRpcClient,
   type Wallet,
-} from '../core/wallets';
-import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../core/contracts';
-import { transferUSDC, getUSDCBalance, formatUSDC, parseUSDC } from '../core/erc20';
+} from '../src/core/wallets';
+import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../src/core/contracts';
+import { transferUSDC, getUSDCBalance, formatUSDC, parseUSDC } from '../src/core/erc20';
 import { formatEther, parseEther } from 'viem';
 import { sepolia } from 'viem/chains';
 

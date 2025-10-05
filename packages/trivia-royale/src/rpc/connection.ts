@@ -26,7 +26,7 @@ import {
   stringToHex,
   keccak256,
 } from "viem";
-import { DEBUG } from "../core/env";
+import { DEBUG } from "../env";
 import type { Wallet } from "../core/wallets";
 
 // ==================== TYPES ====================

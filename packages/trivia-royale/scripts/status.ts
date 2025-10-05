@@ -13,14 +13,14 @@
  *   bun run status server    # Show only Server
  */
 
-import { loadWallets, type Wallet } from '../core/wallets';
+import { loadWallets, type Wallet } from '../src/core/wallets';
 import { NitroliteClient, ChannelStatus } from '@erc7824/nitrolite';
-import { SEPOLIA_CONFIG } from '../core/contracts';
-import { connectToClearNode, authenticateClearNode } from '../rpc/connection';
-import { getLedgerBalances } from '../core/clearnode';
-import { getUSDCBalance, formatUSDC } from '../core/erc20';
+import { SEPOLIA_CONFIG } from '../src/core/contracts';
+import { connectToClearNode, authenticateClearNode } from '../src/rpc/connection';
+import { getLedgerBalances } from '../src/rpc/channels';
+import { getUSDCBalance, formatUSDC } from '../src/core/erc20';
 import { formatEther } from 'viem';
-import { getChannelWithBroker } from '../core/clearnode';
+import { getChannelWithBroker } from '../src/rpc/channels';
 /**
  * Format USDC with more decimals for precision
  */

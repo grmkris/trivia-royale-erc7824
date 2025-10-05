@@ -14,15 +14,15 @@
  *   bun run cashout bob
  */
 
-import { loadWallets, createPublicRpcClient, createNitroliteClient, type Wallet } from '../core/wallets';
-import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../core/contracts';
-import { connectToClearNode, authenticateClearNode } from '../rpc/connection';
+import { loadWallets, createPublicRpcClient, createNitroliteClient, type Wallet } from '../src/core/wallets';
+import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../src/core/contracts';
+import { connectToClearNode, authenticateClearNode } from '../src/rpc/connection';
 import {
   getLedgerBalances,
   getChannelWithBroker,
   closeChannelViaRPC
-} from '../core/clearnode';
-import { getUSDCBalance, formatUSDC } from '../core/erc20';
+} from '../src/rpc/channels';
+import { getUSDCBalance, formatUSDC } from '../src/core/erc20';
 import { formatEther } from 'viem';
 
 async function cashout(wallet: Wallet) {
@@ -83,7 +83,7 @@ async function cashout(wallet: Wallet) {
   if (finalCustodyBalance > 0n) {
     console.log(`💸 Withdrawing ${formatUSDC(finalCustodyBalance)} USDC from custody...\n`);
 
-    const txHash = await nitroliteClient.withdraw(
+    const txHash = await nitroliteClient.withdrawal(
       SEPOLIA_CONFIG.contracts.tokenAddress,
       finalCustodyBalance
     );

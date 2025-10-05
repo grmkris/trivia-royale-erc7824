@@ -2,7 +2,7 @@ import { mnemonicToAccount, generateMnemonic, english } from 'viem/accounts';
 import type { Account, WalletClient, Chain, Transport, ParseAccount, PublicClient, Address } from 'viem';
 import { createWalletClient, createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
-import { env } from './env';
+import { env } from '../env';
 import { generateSessionKeypair } from './keyManager';
 import { NitroliteClient } from '@erc7824/nitrolite';
 import { SessionKeyStateSigner } from '@erc7824/nitrolite/dist/client/signer';
