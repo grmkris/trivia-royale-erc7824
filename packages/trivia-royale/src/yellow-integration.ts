@@ -28,6 +28,7 @@ import {
   type WalletClient,
   type Hex,
   toHex,
+  stringToHex,
   keccak256,
 } from "viem";
 import { DEBUG } from "./env";
@@ -531,7 +532,7 @@ export function createMessageSigner(wallet: WalletClient): MessageSigner {
     // 2. Convert to hex
     // 3. Hash with keccak256
     // 4. Sign the hash directly (NOT signMessage which adds prefix)
-    const message = toHex(
+    const message = stringToHex(
       JSON.stringify(payload, (_, v) =>
         typeof v === 'bigint' ? v.toString() : v
       )

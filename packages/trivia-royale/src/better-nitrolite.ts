@@ -8,11 +8,41 @@ import { getLedgerBalances, getChannelWithBroker, createChannelViaRPC } from "./
 import { createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
-import type { State } from "@erc7824/nitrolite";
+import type { NitroliteRPCMessage, State } from "@erc7824/nitrolite";
 import fs from "fs";
 import { logTxSubmitted } from "./utils/logger";
+import { createApplicationMessage } from '@erc7824/nitrolite';
+import { transferViaLedger } from './utils/clearnode';
+import { NitroliteRPC } from '@erc7824/nitrolite';
 
-type BetterNitroliteClient = {
+// Generic message schema for app sessions
+export interface MessageSchema {
+  [key: string]: {
+    data: any;
+    reply?: any;
+  };
+}
+
+// Type helper for message handler
+type MessageHandler<T extends MessageSchema> = <K extends keyof T>(
+  type: K,
+  sessionId: Hex,
+  data: T[K]['data'],
+  reply?: T[K] extends { reply: infer R } ? (response: R) => Promise<void> : never
+) => void | Promise<void>;
+
+// Session invite type
+export interface SessionInvite {
+  sessionId: Hex;
+  initiator: Address;
+  participants: Address[];
+  allocation?: {
+    asset: string;
+    amount: string;
+  };
+}
+
+type BetterNitroliteClient<T extends MessageSchema = any> = {
   /**
    *
    * @returns balances in custody contract, channel, ledger, and wallet
@@ -54,11 +84,49 @@ type BetterNitroliteClient = {
    * Disconnects from the clearnode
    */
   disconnect: () => Promise<void>;
+  /**
+   * Prepares an unsigned session request
+   * @param params - Session parameters
+   * @returns Unsigned session request object
+   */
+  prepareSession: (params: {
+    participants: Address[];
+    allocations: Array<{
+      participant: Address;
+      asset: string;
+      amount: string;
+    }>;
+  }) => NitroliteRPCMessage;
 
   /**
-   * TODO more methods if needed
+   * Signs a session request
+   * @param request - Session request to sign
+   * @returns Signature string
    */
-    // TODO more methods if needed
+  signSessionRequest: (request: NitroliteRPCMessage) => Promise<string>;
+
+  /**
+   * Creates a new app session with collected signatures
+   * @param request - Signed session request
+   * @param signatures - Array of signatures from all participants
+   * @returns Session ID
+   */
+  createSession: (request: NitroliteRPCMessage, signatures: string[]) => Promise<Hex>;
+  /**
+   * Sends a message within an active session
+   * @param sessionId - The session to send the message to
+   * @param type - Message type
+   * @param data - Message data
+   */
+  sendMessage: <K extends keyof T>(
+    sessionId: Hex,
+    type: K,
+    data: T[K]['data']
+  ) => Promise<void>;
+  /**
+   * Get list of active session IDs
+   */
+  getActiveSessions: () => Hex[];
 }
 
 export type StateStorage = {
@@ -123,31 +191,76 @@ const createFileSystemStateStorage = (walletAddress: Address): StateStorage => {
 };
 
 
-const createMessageHandler = (props: {
+const createMessageHandler = <T extends MessageSchema>(props: {
   client: NitroliteClient,
   stateStorage: StateStorage,
-  wallet: Wallet
+  wallet: Wallet,
+  onAppMessage?: MessageHandler<T>,
+  ws: WebSocket | null,
 }) => {
   return async (event: MessageEvent) => {
-    const response = parseAnyRPCResponse(event.data);
-    switch (response.method) {
-      case RPCMethod.Message:
-        // TODO handle resize channel response
-        console.log(`Received resize channel response:`, response.params);
-        break;
-      case RPCMethod.Error:
-        console.error('ClearNode error:', response.params);
-        break;
-      default:
-        console.log(`Received message:`, response);
-        break;
+    try {
+      const response = parseAnyRPCResponse(event.data);
+      switch (response.method) {
+        case RPCMethod.Message:
+          // Handle application messages
+          if (props.onAppMessage && response.params) {
+            const { appSessionId, message } = response.params;
+            if (message && appSessionId) {
+              const messageType = message.type;
+              const messageData = message.data || {};
+
+              // Create reply function if needed
+              let replyFn: any = undefined;
+              if (message.expectsReply && props.ws) {
+                replyFn = async (replyData: any) => {
+                  const signer = createMessageSigner(
+                    createWalletClient({
+                      account: privateKeyToAccount(props.wallet.sessionPrivateKey),
+                      chain: sepolia,
+                      transport: http(),
+                    })
+                  );
+
+                  const { createApplicationMessage } = await import('@erc7824/nitrolite');
+                  const replyMessage = await createApplicationMessage(
+                    signer,
+                    appSessionId,
+                    {
+                      type: `${messageType}_response`,
+                      data: replyData,
+                      inReplyTo: message.id,
+                    }
+                  );
+
+                  props.ws!.send(replyMessage);
+                };
+              }
+
+              // Call user's handler
+              await props.onAppMessage(messageType, appSessionId, messageData, replyFn);
+            }
+          }
+          break;
+        case RPCMethod.Error:
+          console.error('ClearNode error:', response.params);
+          break;
+        default:
+          // Silently ignore other messages unless debugging
+          break;
+      }
+    } catch (error) {
+      // Not all messages are RPC messages, ignore parse errors
     }
   };
 };
 
-export const createBetterNitroliteClient = (props: {
-  wallet: Wallet
-}): BetterNitroliteClient => {
+export const createBetterNitroliteClient = <T extends MessageSchema = any>(props: {
+  wallet: Wallet;
+  sessionAllowance?: string; // Optional USDC amount to authorize for sessions (e.g., "0.001")
+  onSessionInvite?: (invite: SessionInvite) => Promise<boolean>; // Handler for session invitations
+  onAppMessage?: MessageHandler<T>; // Handler for application messages within sessions
+}): BetterNitroliteClient<T> => {
   const client = new NitroliteClient({
     // @ts-expect-error - wallet.publicClient is a PublicClient
     publicClient: props.wallet.publicClient,
@@ -166,21 +279,50 @@ export const createBetterNitroliteClient = (props: {
 
   let status: 'connected' | 'disconnected' | 'error' = 'disconnected';
   let ws: WebSocket | null = null;
-  const handleMessage = createMessageHandler({ client, stateStorage, wallet: props.wallet });
+
+  // Track active sessions
+  const activeSessions = new Set<Hex>();
+
+  // Create message handler with onAppMessage callback
+  const handleMessage = createMessageHandler<T>({
+    client,
+    stateStorage,
+    wallet: props.wallet,
+    onAppMessage: props.onAppMessage,
+    ws: null, // Will be updated when connected
+  });
 
   const connect = async () => {
     ws = await connectToClearNode(SEPOLIA_CONFIG.clearNodeUrl);
-    await authenticateClearNode(ws, props.wallet, [{ asset: SEPOLIA_CONFIG.game.asset, amount: '1000000000000000000' }]);
+
+    // Prepare allowances if sessionAllowance is provided
+    const allowances = props.sessionAllowance
+      ? [{
+          asset: SEPOLIA_CONFIG.game.asset,
+          amount: parseUSDC(props.sessionAllowance).toString()
+        }]
+      : [];
+
+    await authenticateClearNode(ws, props.wallet, allowances);
     status = 'connected';
+
+    // Update the handler's ws reference
+    const updatedHandler = createMessageHandler<T>({
+      client,
+      stateStorage,
+      wallet: props.wallet,
+      onAppMessage: props.onAppMessage,
+      ws,
+    });
+
     // setup listener
-    ws.addEventListener('message', handleMessage);
+    ws.addEventListener('message', updatedHandler);
   };
 
   const disconnect = async () => {
     if (ws) {
       ws.close();
-      // remove listener
-      ws.removeEventListener('message', handleMessage);
+      // Note: We don't need to explicitly remove listeners since closing the connection does that
       ws = null;
       status = 'disconnected';
     }
@@ -633,9 +775,6 @@ export const createBetterNitroliteClient = (props: {
       throw new Error('Not connected to ClearNode');
     }
 
-    // Import transferViaLedger function
-    const { transferViaLedger } = await import('./utils/clearnode');
-    const { formatUSDC } = await import('./utils/erc20');
 
     await transferViaLedger(
       ws,
@@ -648,6 +787,130 @@ export const createBetterNitroliteClient = (props: {
     console.log(`  ✅ Sent ${formatUSDC(params.amount)} USDC to ${params.to.slice(0, 10)}...`);
   };
 
+  const prepareSession = (params: {
+  participants: Address[];
+    allocations: Array<{
+      participant: Address;
+      asset: string;
+      amount: string;
+    }>;
+  }): NitroliteRPCMessage=> {
+    // Determine weights: server (this wallet) gets 100, others get 0
+    const weights = params.participants.map(p =>
+      p.toLowerCase() === props.wallet.address.toLowerCase() ? 100 : 0
+    );
+
+    // Create unsigned request
+    const request = NitroliteRPC.createRequest({
+      method: RPCMethod.CreateAppSession,
+      params: {
+        definition: {
+          protocol: 'NitroRPC/0.4',
+          participants: params.participants,
+          weights,
+          quorum: 100,
+          challenge: 0,
+          nonce: Date.now(),
+        },
+        allocations: params.allocations
+      },
+      signatures: [], // Start with empty signatures
+    });
+
+    if(!request.req) throw new Error ("Missing request.req")
+
+    return request;
+  };
+
+  const signSessionRequest = async (request: NitroliteRPCMessage): Promise<string> => {
+    const signer = createMessageSigner(
+      createWalletClient({
+        account: privateKeyToAccount(props.wallet.sessionPrivateKey),
+        chain: sepolia,
+        transport: http(),
+      })
+    );
+    const signature = await signer(request.req);
+    return signature;
+  };
+
+  const createSession = async (request: NitroliteRPCMessage, signatures: string[]): Promise<Hex> => {
+    if (!ws || status !== 'connected') {
+      throw new Error('Not connected to ClearNode');
+    }
+
+    request.sig = signatures;
+
+    // Send and wait for response
+    return new Promise((resolve, reject) => {
+      const handleMessage = (event: MessageEvent) => {
+        try {
+          const response = parseAnyRPCResponse(event.data);
+
+          if (response.method === RPCMethod.CreateAppSession) {
+            ws!.removeEventListener('message', handleMessage);
+
+            const sessionId = response.params.appSessionId as Hex;
+            console.log(`  ✅ Session created: ${sessionId}`);
+
+            // Add to active sessions
+            activeSessions.add(sessionId);
+
+            resolve(sessionId);
+          } else if (response.method === RPCMethod.Error) {
+            ws!.removeEventListener('message', handleMessage);
+            reject(new Error(`ClearNode error: ${JSON.stringify(response.params)}`));
+          }
+        } catch (error) {
+          // Ignore parsing errors
+        }
+      };
+
+      console.log('Sending signed message:', request);
+      ws!.addEventListener('message', handleMessage);
+      ws!.send(JSON.stringify(request));
+
+      setTimeout(() => {
+        ws!.removeEventListener('message', handleMessage);
+        reject(new Error('Timeout waiting for session creation'));
+      }, 30000);
+    });
+  };
+
+  const sendMessage = async <K extends keyof T>(
+    sessionId: Hex,
+    type: K,
+    data: T[K]['data']
+  ): Promise<void> => {
+    if (!ws || status !== 'connected') {
+      throw new Error('Not connected to ClearNode');
+    }
+
+    // Check if session is active
+    if (!activeSessions.has(sessionId)) {
+      throw new Error(`Session ${sessionId} is not active`);
+    }
+
+    const signer = createMessageSigner(
+      createWalletClient({
+        account: privateKeyToAccount(props.wallet.sessionPrivateKey),
+        chain: sepolia,
+        transport: http(),
+      })
+    );
+    const message = await createApplicationMessage(
+      signer,
+      sessionId,
+      { type, data }
+    );
+
+    ws.send(message);
+  };
+
+  const getActiveSessions = (): Hex[] => {
+    return Array.from(activeSessions);
+  };
+
   return {
     status: async () => status,
     connect,
@@ -656,5 +919,10 @@ export const createBetterNitroliteClient = (props: {
     withdraw,
     deposit,
     send,
+    prepareSession,
+    signSessionRequest,
+    createSession,
+    sendMessage,
+    getActiveSessions,
   };
 };

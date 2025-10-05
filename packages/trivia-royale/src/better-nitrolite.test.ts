@@ -1,4 +1,4 @@
-import { createBetterNitroliteClient } from "./better-nitrolite";
+import { createBetterNitroliteClient, type MessageSchema } from "./better-nitrolite";
 import { loadWallets } from "./utils/wallets";
 import { expect } from "bun:test";
 import { describe, it } from "bun:test";
@@ -16,7 +16,7 @@ describe('BetterNitrolite', () => {
     await client.disconnect();
   });
 
-  it.only('should handle complete flow: deposit, receive, withdraw', async () => {
+  it('should handle complete flow: deposit, receive, withdraw', async () => {
     const wallets = loadWallets();
 
     // Use test10 as main wallet (should have funds)
@@ -138,10 +138,120 @@ describe('BetterNitrolite', () => {
   }, 200000);
 
 
-  it('should handle app session', async () => {
+  it.only('should create session with distributed signatures', async () => {
     const wallets = loadWallets();
-    const client = createBetterNitroliteClient({ wallet: wallets.test18 });
-    await client.connect();
-    await client.disconnect();
-  });
+
+    // Create multiple clients (simulating players)
+    const player1 = wallets.test24;
+    const player2 = wallets.test25;
+    const server = wallets.server;
+
+    console.log('\n🎮 Testing Distributed Session Creation\n');
+    console.log(`Server: ${server.address}`);
+    console.log(`Player 1: ${player1.address}`);
+    console.log(`Player 2: ${player2.address}\n`);
+
+    // Define message schema for game
+    interface GameSchema extends MessageSchema {
+      start_game: {
+        data: { round: number };
+      };
+    }
+
+    // Create clients for each participant
+    const client1 = createBetterNitroliteClient<GameSchema>({
+      wallet: player1,
+      sessionAllowance: '0.00001',
+    });
+
+    const client2 = createBetterNitroliteClient<GameSchema>({
+      wallet: player2,
+      sessionAllowance: '0.00001',
+    });
+
+    const serverClient = createBetterNitroliteClient<GameSchema>({
+      wallet: server,
+    });
+
+    // Connect all clients
+    console.log('🔗 Connecting all participants...\n');
+    await Promise.all([
+      client1.connect(),
+      client2.connect(),
+      serverClient.connect()
+    ]);
+    console.log('✅ All clients connected\n');
+
+    // === DISTRIBUTED SESSION CREATION FLOW ===
+
+    console.log('📝 Step 1: Server prepares session request\n');
+    const sessionRequest = serverClient.prepareSession({
+      participants: [player1.address, player2.address, server.address],
+      allocations: [
+        { participant: player1.address, asset: 'USDC', amount: '0.0000001' },
+        { participant: player2.address, asset: 'USDC', amount: '0.0000001' },
+        { participant: server.address, asset: 'USDC', amount: '0' },
+      ],
+    });
+
+    console.log('   ✅ Session request prepared');
+    // In real app: server would send sessionRequest via HTTP/WS to players
+    // For test: we pass it directly
+
+    console.log('✍️  Step 2: All participants sign the request\n');
+
+    const [sig1, sig2, sigServer] = await Promise.all([
+      client1.signSessionRequest(sessionRequest),
+      client2.signSessionRequest(sessionRequest),
+      serverClient.signSessionRequest(sessionRequest),
+    ]);
+
+    console.log(`   ✅ Player 1 signature: ${sig1.slice(0, 20)}...`);
+    console.log(`   ✅ Player 2 signature: ${sig2.slice(0, 20)}...`);
+    console.log(`   ✅ Server signature: ${sigServer.slice(0, 20)}...\n`);
+
+    // In real app: players would send signatures back to server via HTTP/WS
+    // Server collects them
+
+    console.log('🎮 Step 3: Server creates session with all signatures\n');
+
+    // IMPORTANT: Signature order must match createGameSessionWithMultiSig pattern:
+    // 1. Server signature first
+    // 2. Then player signatures in allocation order (only those with non-zero amounts)
+    const sessionId = await serverClient.createSession(sessionRequest, [sigServer, sig1, sig2]);
+
+    console.log(`   ✅ Session created: ${sessionId}\n`);
+
+    // In real app: server would broadcast sessionId to all players
+    // They would add it to their active sessions
+    // For test: we manually add it
+
+    client1.getActiveSessions(); // Would add sessionId
+    client2.getActiveSessions();
+
+    console.log('📨 Step 4: Exchange messages in session\n');
+
+    // Now they can exchange typed messages
+    await serverClient.sendMessage(sessionId, 'start_game', { round: 1 });
+    console.log('   ✅ Server sent start_game message\n');
+
+    // Check active sessions
+    const activeSessions = serverClient.getActiveSessions();
+    expect(activeSessions).toContain(sessionId);
+    console.log(`   ✅ Active sessions: ${activeSessions.length}\n`);
+
+    // Disconnect all
+    console.log('🔌 Disconnecting all clients...');
+    await Promise.all([
+      client1.disconnect(),
+      client2.disconnect(),
+      serverClient.disconnect()
+    ]);
+    console.log('✅ Test complete\n');
+
+    console.log('💡 Key Insight:');
+    console.log('   Coordination happens outside the protocol (HTTP/WS/direct)');
+    console.log('   BetterNitroliteClient provides pure functions for session creation');
+    console.log('   App developers choose their coordination mechanism\n');
+  }, 60000);
 });
