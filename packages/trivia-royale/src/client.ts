@@ -1,18 +1,18 @@
-import { SEPOLIA_CONFIG } from "./utils/contracts";
+import { SEPOLIA_CONFIG } from "./core/contracts";
 import { NitroliteClient, SessionKeyStateSigner, createResizeChannelMessage, parseCloseAppSessionResponse, parseResizeChannelResponse, parseAnyRPCResponse, RPCMethod, createCloseAppSessionMessage, parseMessageResponse } from "@erc7824/nitrolite";
-import type { Wallet } from "./utils/wallets";
+import type { Wallet } from "./core/wallets";
 import type { Address, Chain, Hex } from "viem";
-import { connectToClearNode, authenticateClearNode, createMessageSigner } from "./yellow-integration";
-import { getUSDCBalance, parseUSDC, formatUSDC, ensureAllowance } from "./utils/erc20";
-import { getLedgerBalances, getChannelWithBroker, createChannelViaRPC } from "./utils/clearnode";
+import { connectToClearNode, authenticateClearNode, createMessageSigner } from "./rpc/connection";
+import { getUSDCBalance, parseUSDC, formatUSDC, ensureAllowance } from "./core/erc20";
+import { getLedgerBalances, getChannelWithBroker, createChannelViaRPC } from "./rpc/channels";
 import { createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import type { NitroliteRPCMessage, State } from "@erc7824/nitrolite";
 import fs from "fs";
-import { logTxSubmitted } from "./utils/logger";
+import { logTxSubmitted } from "./core/logger";
 import { createApplicationMessage } from '@erc7824/nitrolite';
-import { transferViaLedger } from './utils/clearnode';
+import { transferViaLedger } from './rpc/ledger';
 import { NitroliteRPC } from '@erc7824/nitrolite';
 import { z } from "zod";
 // Generic message schema for app sessions
@@ -218,7 +218,6 @@ const createMessageHandler = <T extends MessageSchema>(props: {
   return async (event: MessageEvent) => {
     try {
       const response = parseAnyRPCResponse(event.data);
-      console.log('Received message1:', response);
       switch (response.method) {
         case RPCMethod.Message:
           const MessageResponseSchema = z.object({
@@ -455,7 +454,6 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     return new Promise<void>((resolve, reject) => {
       const handleMessage = async (event: MessageEvent) => {
         try {
-          console.log(`Received message:`, event.data);
           const response = parseAnyRPCResponse(event.data);
 
           if (response.method === RPCMethod.ResizeChannel) {
@@ -476,7 +474,6 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
             const proofStates = await stateStorage.getChannelState(channelId);
             const parsedResponse = parseResizeChannelResponse(event.data);
             const { state, serverSignature } = parsedResponse.params;
-            console.log(`Resize channel response:`, state, serverSignature, proofStates);
 
             // Submit resize transaction
             const txHash = await client.resizeChannel({
@@ -565,7 +562,6 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
             const parsedResponse = parseResizeChannelResponse(event.data);
             const { state, serverSignature } = parsedResponse.params;
 
-            console.log(`Resize channel response:`, {state, serverSignature, proofStates});
             // Submit resize transaction
             const txHash = await client.resizeChannel({
               resizeState: {

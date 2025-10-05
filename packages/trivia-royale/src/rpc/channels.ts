@@ -1,8 +1,11 @@
 /**
- * ClearNode WebSocket Management
+ * Channel RPC Operations
  *
- * Functional helpers for managing multiple WebSocket connections
- * to Yellow Network's ClearNode service.
+ * ClearNode RPC operations for state channel management:
+ * - Creating channels with broker
+ * - Resizing channels (adding funds)
+ * - Closing channels
+ * - Querying channel information
  */
 
 
@@ -15,7 +18,7 @@ import {
   connectToClearNode,
   authenticateClearNode,
   createMessageSigner,
-} from '../yellow-integration';
+} from './connection';
 import {
   createGetLedgerBalancesMessage,
   createCreateChannelMessage,
@@ -36,37 +39,19 @@ import {
   parseChannelUpdateResponse,
   type State,
 } from '@erc7824/nitrolite';
-import { SEPOLIA_CONFIG, getEtherscanTxLink } from './contracts';
-import type { Wallet } from './wallets';
+import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../core/contracts';
+import type { Wallet } from '../core/wallets';
+import { createNitroliteClient } from '../core/wallets';
 import type { Address, Hex } from 'viem';
 import { createWalletClient, http, parseUnits } from 'viem';
-import { createNitroliteClient } from './channels';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { parseUSDC, ensureAllowance } from './erc20';
-import type { StateStorage } from '../better-nitrolite';
-import { logTxSubmitted } from './logger';
+import { parseUSDC, ensureAllowance } from '../core/erc20';
+import type { StateStorage } from '../client';
+import { logTxSubmitted } from '../core/logger';
 
-/**
- * Connect and authenticate all participants to ClearNode
- */
-export async function connectAllParticipants(
-  wallets: Wallet[]
-): Promise<Map<string, WebSocket>> {
-  const connections = new Map<string, WebSocket>();
-
-  for (const wallet of wallets) {
-    console.log(`   🔗 ${wallet.name}: Connecting...`);
-
-    const ws = await connectToClearNode(SEPOLIA_CONFIG.clearNodeUrl);
-    await authenticateClearNode(ws, wallet);
-
-    connections.set(wallet.name, ws);
-    console.log(`   ✅ ${wallet.name}: Authenticated`);
-  }
-
-  return connections;
-}
+// Note: Batch connection helpers removed (connectAllParticipants, disconnectAll)
+// Use connectToClearNode + authenticateClearNode directly for individual connections
 
 /**
  * Create a channel via ClearNode RPC
@@ -525,6 +510,12 @@ export async function getChannelWithBroker(
 }
 
 /**
+ * Get off-chain ledger balances from ClearNode
+ *
+ * These are the balances managed by ClearNode off-chain.
+ * They update in real-time as application sessions open/close.
+ */
+/**
  * Re-authenticate with allowances for app session
  *
  * Before creating an app session with non-zero allocations, each participant
@@ -699,16 +690,4 @@ export async function transferViaLedger(
       reject(error);
     }
   });
-}
-
-/**
- * Close all WebSocket connections
- */
-export function disconnectAll(connections: Map<string, WebSocket>): void {
-  for (const [name, ws] of connections) {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.close();
-    }
-  }
-  console.log(`   🔌 Disconnected all (${connections.size} connections)`);
 }

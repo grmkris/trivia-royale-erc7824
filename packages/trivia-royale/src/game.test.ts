@@ -1,8 +1,8 @@
-import { createBetterNitroliteClient, type MessageSchema } from "./better-nitrolite";
-import { loadWallets } from "./utils/wallets";
+import { createBetterNitroliteClient, type MessageSchema } from "./client";
+import { loadWallets } from "./core/wallets";
 import { expect } from "bun:test";
 import { describe, it } from "bun:test";
-import { formatUSDC, parseUSDC } from "./utils/erc20";
+import { formatUSDC, parseUSDC } from "./core/erc20";
 import type { Address, Hex } from "viem";
 
 describe('BetterNitrolite - Multi-Round Trivia Game', () => {

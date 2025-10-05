@@ -14,17 +14,16 @@
  *   bun run cashout bob
  */
 
-import { loadWallets, createPublicRpcClient, type Wallet } from './utils/wallets';
-import { SEPOLIA_CONFIG, getEtherscanTxLink } from './utils/contracts';
-import { connectToClearNode, authenticateClearNode } from './yellow-integration';
+import { loadWallets, createPublicRpcClient, createNitroliteClient, type Wallet } from '../core/wallets';
+import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../core/contracts';
+import { connectToClearNode, authenticateClearNode } from '../rpc/connection';
 import {
   getLedgerBalances,
   getChannelWithBroker,
   closeChannelViaRPC
-} from './utils/clearnode';
-import { getUSDCBalance, formatUSDC } from './utils/erc20';
+} from '../core/clearnode';
+import { getUSDCBalance, formatUSDC } from '../core/erc20';
 import { formatEther } from 'viem';
-import { createNitroliteClient } from './utils/channels';
 
 async function cashout(wallet: Wallet) {
   console.log(`\n💰 CASHOUT - ${wallet.name}\n`);

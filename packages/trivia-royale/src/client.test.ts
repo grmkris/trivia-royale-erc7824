@@ -1,9 +1,9 @@
-import { createBetterNitroliteClient, type MessageSchema } from "./better-nitrolite";
-import { loadWallets } from "./utils/wallets";
+import { createBetterNitroliteClient, type MessageSchema } from "./client";
+import { loadWallets } from "./core/wallets";
 import { expect } from "bun:test";
 import { describe, it } from "bun:test";
 // Import needed utilities
-import { formatUSDC } from "./utils/erc20";
+import { formatUSDC } from "./core/erc20";
 
 describe('BetterNitrolite', () => {
   it('should be able to get balances', async () => {

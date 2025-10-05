@@ -15,10 +15,10 @@ import {
   loadWallets,
   createPublicRpcClient,
   deriveAddress,
-} from './utils/wallets';
-import { SEPOLIA_CONFIG } from './utils/contracts';
+} from '../core/wallets';
+import { SEPOLIA_CONFIG } from '../core/contracts';
 import { env } from './env';
-import { getUSDCBalance, formatUSDC, parseUSDC } from './utils/erc20';
+import { getUSDCBalance, formatUSDC, parseUSDC } from '../core/erc20';
 
 const WALLET_NAMES = ['Funding', 'Broker', 'Server', 'Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
 

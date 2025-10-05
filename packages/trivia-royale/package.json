@@ -5,14 +5,14 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "prepare": "bun run src/prepare.ts",
-    "fund": "bun run src/fund.ts",
-    "status": "bun run src/status.ts",
-    "test-clearnode": "bun run src/test-clearnode.ts",
-    "play": "bun run src/play.ts",
-    "cashout": "bun run src/cashout.ts",
-    "e2e-flow": "bun run src/e2e-flow.ts",
-    "check-types": "tsc --noEmit"
+    "test": "bun run src/game.test.ts",
+    "test:client": "bun run src/client.test.ts",
+    "test:game": "bun run src/game.test.ts",
+    "typecheck": "tsc --noEmit",
+    "prepare": "bun run src/scripts/prepare.ts",
+    "fund": "bun run src/scripts/fund.ts",
+    "status": "bun run src/scripts/status.ts",
+    "cashout": "bun run src/scripts/cashout.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.2.23"
