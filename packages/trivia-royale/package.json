@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "module": "src/index.ts",
   "type": "module",
-  "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./fs-key-manager": "./src/core/key-manager-fs.ts"
   },
   "scripts": {
     "test": "bun run src/game.test.ts",

@@ -37,7 +37,7 @@ export function generateSessionKeypair(): SessionKeypair {
  * Interface for managing session keypairs
  * Fully encapsulated - handles generation internally
  */
-export interface KeyManager {
+export interface SessionKeyManager {
   /**
    * Get session key for a wallet address
    * @returns Session keypair or undefined if no key exists
@@ -60,7 +60,7 @@ export interface KeyManager {
 /**
  * In-memory key manager (ephemeral, for tests/temporary use)
  */
-export function createInMemoryKeyManager(): KeyManager {
+export function createInMemoryKeyManager(): SessionKeyManager {
   const keys = new Map<Address, SessionKeypair>();
 
   return {
@@ -83,7 +83,7 @@ export function createInMemoryKeyManager(): KeyManager {
 /**
  * LocalStorage key manager (browser persistence)
  */
-export function createLocalStorageKeyManager(): KeyManager {
+export function createLocalStorageKeyManager(): SessionKeyManager {
   const STORAGE_PREFIX = 'nitrolite:session-key:';
 
   return {

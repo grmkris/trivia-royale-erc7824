@@ -3,31 +3,29 @@
 import { formatUSDC } from '@trivia-royale/game';
 import { useNitrolite } from '@/providers/NitroliteProvider';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export function BalanceDisplay() {
   const { balances, status } = useNitrolite();
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   if (status === 'connecting') {
     return (
-      <div className="grid gap-3 p-4 border rounded-lg">
-        <Skeleton className="h-6 w-24" />
-        <div className="grid grid-cols-2 gap-2">
-          <Skeleton className="h-16 rounded" />
-          <Skeleton className="h-16 rounded" />
-          <Skeleton className="h-16 rounded" />
-          <Skeleton className="h-16 rounded" />
-        </div>
-        <Skeleton className="h-6 w-full" />
+      <div className="p-6 border rounded-lg text-center">
+        <Skeleton className="h-12 w-48 mx-auto mb-2" />
+        <Skeleton className="h-4 w-32 mx-auto" />
       </div>
     );
   }
 
   if (status !== 'connected') {
     return (
-      <div className="p-4 border rounded-lg">
-        <h3 className="font-semibold mb-2">Balances</h3>
-        <div className="text-sm text-gray-500">
-          Connect wallet to see balances
+      <div className="p-6 border rounded-lg text-center">
+        <div className="text-4xl font-bold mb-2">--</div>
+        <div className="text-sm text-muted-foreground">
+          Connect to see balance
         </div>
       </div>
     );
@@ -36,39 +34,53 @@ export function BalanceDisplay() {
   const total = (balances?.channel ?? 0n) + (balances?.ledger ?? 0n) + (balances?.custodyContract ?? 0n);
 
   return (
-    <div className="grid gap-3 p-4 border rounded-lg">
-      <h3 className="font-semibold">Balances</h3>
-
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <div className="p-2 bg-blue-50 rounded">
-          <div className="text-xs text-gray-600">💰 Wallet</div>
-          <div className="font-mono">{formatUSDC(balances?.wallet ?? 0n)} USDC</div>
+    <div className="p-6 border rounded-lg">
+      {/* Hero Balance */}
+      <div className="text-center mb-4">
+        <div className="text-4xl font-bold mb-1 font-mono">
+          ${formatUSDC(total)}
         </div>
-
-        <div className="p-2 bg-purple-50 rounded">
-          <div className="text-xs text-gray-600">🏦 Custody</div>
-          <div className="font-mono">{formatUSDC(balances?.custodyContract ?? 0n)} USDC</div>
-        </div>
-
-        <div className="p-2 bg-green-50 rounded">
-          <div className="text-xs text-gray-600">🔗 Channel</div>
-          <div className="font-mono">{formatUSDC(balances?.channel ?? 0n)} USDC</div>
-        </div>
-
-        <div className="p-2 bg-orange-50 rounded">
-          <div className="text-xs text-gray-600">📊 Ledger</div>
-          <div className="font-mono">{formatUSDC(balances?.ledger ?? 0n)} USDC</div>
+        <div className="text-sm text-muted-foreground">
+          Available Balance
         </div>
       </div>
 
-      <div className="pt-2 border-t text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Total Available:</span>
-          <span className="font-mono font-semibold">
-            {formatUSDC(total)} USDC
-          </span>
+      {/* Breakdown Toggle */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full"
+        onClick={() => setShowBreakdown(!showBreakdown)}
+      >
+        {showBreakdown ? 'Hide' : 'Show'} breakdown
+        {showBreakdown ? (
+          <ChevronUp className="ml-2 h-4 w-4" />
+        ) : (
+          <ChevronDown className="ml-2 h-4 w-4" />
+        )}
+      </Button>
+
+      {/* Detailed Breakdown */}
+      {showBreakdown && (
+        <div className="mt-4 space-y-2 text-sm border-t pt-4">
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">💰 Wallet</span>
+            <span className="font-mono">${formatUSDC(balances?.wallet ?? 0n)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">🏦 Custody</span>
+            <span className="font-mono">${formatUSDC(balances?.custodyContract ?? 0n)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">🔗 Channel</span>
+            <span className="font-mono">${formatUSDC(balances?.channel ?? 0n)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">📊 Ledger</span>
+            <span className="font-mono">${formatUSDC(balances?.ledger ?? 0n)}</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

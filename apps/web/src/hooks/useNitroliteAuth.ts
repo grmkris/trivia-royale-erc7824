@@ -48,8 +48,11 @@ export function useNitroliteAuth(): UseNitroliteAuthResult {
 			const keyManager = createLocalStorageKeyManager();
 
 			// Create Wallet object with persistent session keys
-			// @ts-expect-error - wagmi account is compatible with viem Account
-			const wallet = createWallet(walletClient.data.account, keyManager);
+			const wallet = createWallet({
+				walletClient: walletClient.data,
+				publicClient,
+				sessionKeyManager: keyManager
+			});
 
 			// Create BetterNitroliteClient
 			const nitroliteClient = createBetterNitroliteClient({

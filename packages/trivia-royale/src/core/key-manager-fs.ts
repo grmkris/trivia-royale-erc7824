@@ -8,7 +8,7 @@
 import type { Address } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import fs from 'fs';
-import type { KeyManager, SessionKeypair } from './key-manager';
+import type { SessionKeyManager, SessionKeypair } from './key-manager';
 import { generateSessionKeypair } from './key-manager';
 
 /**
@@ -17,7 +17,7 @@ import { generateSessionKeypair } from './key-manager';
  * @param dataDir - Directory to store session key files (default: current directory)
  * @returns KeyManager instance that persists keys to disk
  */
-export function createFileSystemKeyManager(dataDir: string = '.'): KeyManager {
+export function createFileSystemKeyManager(dataDir: string = '.'): SessionKeyManager {
   // Ensure data directory exists
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });

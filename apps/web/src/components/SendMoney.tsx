@@ -5,6 +5,8 @@ import { parseUSDC } from '@trivia-royale/game';
 import { useNitrolite } from '@/providers/NitroliteProvider';
 import { isAddress, type Address } from 'viem';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useQuery } from '@tanstack/react-query';
 
 export function SendMoney() {
@@ -68,54 +70,57 @@ export function SendMoney() {
 
   return (
     <div className="p-4 border rounded-lg space-y-3">
-      <h3 className="font-semibold">Send Money (Off-chain)</h3>
+      <h3 className="font-semibold text-sm">Send Money</h3>
 
       <div className="space-y-2">
-        <input
+        <Input
           type="text"
           value={to}
           onChange={e => setTo(e.target.value)}
           placeholder="Recipient address (0x...)"
-          className="w-full px-3 py-2 border rounded font-mono text-sm"
+          className="font-mono text-xs"
           disabled={loading}
         />
 
         {serverAddress && (
-          <button
+          <Button
             onClick={() => setTo(serverAddress)}
-            className="text-xs text-blue-600 hover:underline"
+            variant="ghost"
+            size="sm"
+            className="text-xs h-auto p-0 hover:underline"
             type="button"
           >
-            Use server address: {serverAddress.slice(0, 10)}...
-          </button>
+            Use server: {serverAddress.slice(0, 8)}...
+          </Button>
         )}
 
-        <input
+        <Input
           type="text"
           value={amount}
           onChange={e => setAmount(e.target.value)}
           placeholder="Amount (USDC)"
-          className="w-full px-3 py-2 border rounded"
           disabled={loading}
+          className="text-base"
         />
       </div>
 
-      <button
+      <Button
         onClick={handleSend}
         disabled={loading || !isAddress(to) || !client}
-        className="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full h-11"
+        size="lg"
       >
-        {loading ? 'Sending...' : 'Send via Ledger 🚀'}
-      </button>
+        {loading ? 'Sending...' : '→ Send'}
+      </Button>
 
       {error && (
-        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+        <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
           {error}
         </div>
       )}
 
-      <p className="text-xs text-gray-500">
-        Instant off-chain transfer via ClearNode ledger. No gas fees!
+      <p className="text-xs text-muted-foreground">
+        Instant off-chain transfer. No gas fees.
       </p>
     </div>
   );

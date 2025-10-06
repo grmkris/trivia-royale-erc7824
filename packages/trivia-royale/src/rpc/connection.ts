@@ -107,7 +107,7 @@ export async function authenticateClearNode(
       // Step 1: Send auth request with main wallet and session key
       const authRequest = await createAuthRequestMessage({
         address: walletAddress,                // Main wallet address
-        session_key: wallet.sessionAddress,    // Session wallet address (from wallet)
+        session_key: wallet.sessionSigner.address,    // Session wallet address
         app_name: "Test Domain",
         expire, // Pass as string
         scope: "console",
@@ -130,7 +130,7 @@ export async function authenticateClearNode(
               const partialMessage = {
                 scope: "console",
                 application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
-                participant: wallet.sessionAddress, // Session wallet address (not main!)
+                participant: wallet.sessionSigner.address, // Session wallet address (not main!)
                 expire, // STRING (matches official SDK integration tests)
                 allowances,                         // Pass allowances (default: [])
               } satisfies PartialEIP712AuthMessage;
@@ -193,33 +193,3 @@ export async function authenticateClearNode(
 // Legacy createGameSession/sendGameMessage/closeGameSession functions removed
 
 // ==================== UTILITIES ====================
-
-/**
- * Create a message signer from a wallet
- *
- * This creates an ECDSA signer for general RPC methods (create_channel, etc.).
- * Pattern matches SDK's createECDSAMessageSigner but uses WalletClient instead of raw private key.
- *
- * Note: Auth messages use createEIP712AuthMessageSigner, other RPC methods use raw ECDSA.
- */
-export function createMessageSigner(wallet: WalletClient): MessageSigner {
-  return async (payload) => {
-    if (!wallet.account) throw new Error("No account in wallet");
-
-    // Match SDK's ECDSA signer pattern:
-    // 1. JSON.stringify with BigInt handling
-    // 2. Convert to hex
-    // 3. Hash with keccak256
-    // 4. Sign the hash directly (NOT signMessage which adds prefix)
-    const message = stringToHex(
-      JSON.stringify(payload, (_, v) =>
-        typeof v === 'bigint' ? v.toString() : v
-      )
-    );
-
-    const hash = keccak256(message);
-    const signature = await wallet.account.sign?.({ hash });
-    if (!signature) throw new Error("Failed to sign message");
-    return signature;
-  };
-}

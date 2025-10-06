@@ -19,12 +19,17 @@ export { parseUSDC, formatUSDC } from './core/erc20';
 export { SEPOLIA_CONFIG } from './core/contracts';
 
 // Key management (for persistent session keys)
-export type { KeyManager, SessionKeypair } from './core/key-manager';
+export type { SessionKeyManager as KeyManager, SessionKeypair } from './core/key-manager';
 export {
   createInMemoryKeyManager,
   createLocalStorageKeyManager,
 } from './core/key-manager';
 
-// Filesystem key manager (Node.js only)
-// For Node.js environments, import from './core/key-manager-fs' directly:
-// import { createFileSystemKeyManager } from '@your-package/trivia-royale/core/key-manager-fs';
+// Game types
+export type {
+  TriviaGameSchema,
+  LobbyPlayer,
+  LobbyState,
+  SignatureSubmission,
+  GameState,
+} from './game-types';

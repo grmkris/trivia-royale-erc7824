@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { parseUSDC } from '@trivia-royale/game';
 import { useNitrolite } from '@/providers/NitroliteProvider';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export function DepositWithdraw() {
   const { client, refreshBalances, status } = useNitrolite();
@@ -61,45 +63,46 @@ export function DepositWithdraw() {
 
   return (
     <div className="p-4 border rounded-lg space-y-3">
-      <h3 className="font-semibold">Deposit / Withdraw</h3>
+      <h3 className="font-semibold text-sm">Deposit / Withdraw</h3>
 
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          placeholder="Amount (USDC)"
-          className="flex-1 px-3 py-2 border rounded"
-          disabled={loading}
-        />
-      </div>
+      <Input
+        type="text"
+        value={amount}
+        onChange={e => setAmount(e.target.value)}
+        placeholder="Amount (USDC)"
+        disabled={loading}
+        className="text-base"
+      />
 
-      <div className="flex gap-2">
-        <button
+      <div className="flex flex-col gap-2">
+        <Button
           onClick={handleDeposit}
           disabled={loading || !client}
-          className="flex-1 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-11"
+          size="lg"
         >
-          {loading ? 'Processing...' : 'Deposit →'}
-        </button>
+          {loading ? 'Processing...' : '↓ Deposit'}
+        </Button>
 
-        <button
+        <Button
           onClick={handleWithdraw}
           disabled={loading || !client}
-          className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          variant="outline"
+          className="w-full h-11"
+          size="lg"
         >
-          {loading ? 'Processing...' : '← Withdraw'}
-        </button>
+          {loading ? 'Processing...' : '↑ Withdraw'}
+        </Button>
       </div>
 
       {error && (
-        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+        <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
           {error}
         </div>
       )}
 
-      <p className="text-xs text-gray-500">
-        Deposit moves funds wallet → channel. Withdraw moves channel/ledger/custody → wallet.
+      <p className="text-xs text-muted-foreground">
+        Deposit from wallet. Withdraw to wallet.
       </p>
     </div>
   );

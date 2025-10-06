@@ -3,7 +3,7 @@ import { createWalletClient, createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
 import { testEnv } from './testEnv';
 import { createFileSystemKeyManager } from '../src/core/key-manager-fs';
-import type { Wallet } from '../src/core/wallets';
+import { createSessionSigner, type Wallet } from '../src/core/wallets';
 
 const WALLET_NAMES = [
   'Funding',   // index 0 - Funding source (receives from faucets, distributes to all)
@@ -160,7 +160,7 @@ export function loadWallets(): Wallets {
     // Use persistent session keys for tests (get existing or generate new)
     const sessionKeypair = keyManager.getSessionKey(account.address)
       ?? keyManager.generateSessionKey(account.address);
-    
+
     return {
       name,
       index,
@@ -168,8 +168,7 @@ export function loadWallets(): Wallets {
       walletClient,
       publicClient,
       address: account.address,
-      sessionPrivateKey: sessionKeypair.privateKey,
-      sessionAddress: sessionKeypair.address,
+      sessionSigner: createSessionSigner(sessionKeypair.privateKey),
     };
   });
 

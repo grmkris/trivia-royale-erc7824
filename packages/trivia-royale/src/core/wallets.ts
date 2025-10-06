@@ -1,24 +1,55 @@
-import { generateMnemonic, english, mnemonicToAccount } from 'viem/accounts';
+import { generateMnemonic, english, mnemonicToAccount, privateKeyToAccount } from 'viem/accounts';
 import type { Account, WalletClient, PublicClient, Address } from 'viem';
-import { createWalletClient, createPublicClient, http } from 'viem';
+import { createWalletClient, createPublicClient, http, stringToHex, keccak256 } from 'viem';
 import { sepolia } from 'viem/chains';
-import { NitroliteClient } from '@erc7824/nitrolite';
+import { NitroliteClient, type MessageSigner } from '@erc7824/nitrolite';
 import { SessionKeyStateSigner } from '@erc7824/nitrolite/dist/client/signer';
 import { SEPOLIA_CONFIG } from './contracts';
-import type { KeyManager } from './key-manager';
+import type { SessionKeyManager } from './key-manager';
 
 // Note: Test wallet utilities (loadWallets, WALLET_NAMES, etc.) moved to scripts/testWallets.ts
+
+/**
+ * Session signer encapsulates session key operations
+ */
+export interface SessionSigner {
+  address: Address;
+  sign: MessageSigner;  // For RPC messages to ClearNode
+  createStateSigner: () => SessionKeyStateSigner;  // For on-chain state signing
+}
+
+/**
+ * Create a session signer from a session private key
+ */
+export function createSessionSigner(privateKey: `0x${string}`): SessionSigner {
+  const account = privateKeyToAccount(privateKey);
+
+  return {
+    address: account.address,
+
+    // RPC message signer (for WebSocket messages to ClearNode)
+    sign: async (payload) => {
+      const message = stringToHex(
+        JSON.stringify(payload, (_, v) => typeof v === 'bigint' ? v.toString() : v)
+      );
+      const hash = keccak256(message);
+      return await account.sign({ hash });
+    },
+
+    // State signer factory (for on-chain transactions)
+    createStateSigner: () => new SessionKeyStateSigner(privateKey)
+  };
+}
 
 export interface Wallet {
   name: string;
   index: number;
   account: Account;
   walletClient: WalletClient;
-  publicClient: PublicClient; 
+  publicClient: PublicClient;
   address: Address;
-  // Session keypair for ClearNode operations (signing states, RPC messages)
-  sessionPrivateKey: `0x${string}`;
-  sessionAddress: Address;
+  // Session signer for ClearNode operations (signing states, RPC messages)
+  sessionSigner: SessionSigner;
 }
 
 // Note: Wallets interface moved to scripts/testWallets.ts
@@ -27,37 +58,33 @@ export interface Wallet {
  * Create a wallet from an account
  *
  * @param account - Viem account (from privateKeyToAccount, mnemonicToAccount, etc.)
- * @param keyManager - KeyManager for session key management (required)
+ * @param sessionKeyManager - KeyManager for session key management (required)
  *
  * Useful for backends and frontends that manage their own keys
  */
 export function createWallet(
-  account: Account,
-  keyManager: KeyManager
+  props: {
+    walletClient: WalletClient,
+    publicClient: PublicClient,
+    sessionKeyManager: SessionKeyManager
+  }
 ): Wallet {
-  const walletClient = createWalletClient({
-    account,
-    chain: sepolia,
-    transport: http(),
-  });
-  const publicClient = createPublicClient({
-    chain: sepolia,
-    transport: http(),
-  });
-
+  const { walletClient, publicClient, sessionKeyManager } = props;
+  if (!walletClient.account?.address) {
+    throw new Error('Wallet client account is required');
+  }
   // Get existing session key or generate new one via KeyManager
-  const sessionKeypair = keyManager.getSessionKey(account.address)
-    ?? keyManager.generateSessionKey(account.address);
+  const sessionKeypair = sessionKeyManager.getSessionKey(walletClient.account.address)
+    ?? sessionKeyManager.generateSessionKey(walletClient.account.address);
 
   return {
     name: 'backend',
     index: -1,
-    account,
+    account: walletClient.account,
     walletClient,
     publicClient,
-    address: account.address,
-    sessionPrivateKey: sessionKeypair.privateKey,
-    sessionAddress: sessionKeypair.address,
+    address: walletClient.account.address,
+    sessionSigner: createSessionSigner(sessionKeypair.privateKey),
   };
 }
 
@@ -99,7 +126,7 @@ export function createNitroliteClient(
   wallet: Wallet,
   brokerAddress: Address
 ): NitroliteClient {
-  const stateSigner = new SessionKeyStateSigner(wallet.sessionPrivateKey);
+  const stateSigner = wallet.sessionSigner.createStateSigner();
 
   return new NitroliteClient({
     // @ts-expect-error - viem version mismatch between dependencies

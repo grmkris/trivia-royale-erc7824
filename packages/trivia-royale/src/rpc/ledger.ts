@@ -15,7 +15,6 @@ BigInt.prototype["toJSON"] = function () {
 import {
   connectToClearNode,
   authenticateClearNode,
-  createMessageSigner,
 } from './connection';
 import {
   createGetLedgerBalancesMessage,
@@ -51,8 +50,6 @@ export async function getLedgerBalances(
 ): Promise<Array<{ asset: string; amount: string }>> {
   return new Promise(async (resolve, reject) => {
     try {
-      const signer = createMessageSigner(wallet.walletClient);
-
       // Create message handler
       const handleMessage = (event: MessageEvent) => {
         try {
@@ -79,7 +76,7 @@ export async function getLedgerBalances(
       ws.addEventListener('message', handleMessage);
 
       // Create and send request
-      const message = await createGetLedgerBalancesMessage(signer, wallet.address);
+      const message = await createGetLedgerBalancesMessage(wallet.sessionSigner.sign, wallet.address);
       ws.send(message);
     } catch (error) {
       reject(error);
@@ -112,12 +109,6 @@ export async function transferViaLedger(
     try {
       console.log(`  💸 ${fromWallet.name}: Transferring ${amount} ${asset.toUpperCase()} to ${toAddress.slice(0, 10)}...`);
 
-      const sessionSigner = createMessageSigner(createWalletClient({
-        account: privateKeyToAccount(fromWallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      }));
-
       // Create message handler for RPC response
       const handleMessage = async (event: MessageEvent) => {
         try {
@@ -145,7 +136,7 @@ export async function transferViaLedger(
       ws.addEventListener('message', handleMessage);
 
       // Send transfer request
-      const message = await createTransferMessage(sessionSigner, {
+      const message = await createTransferMessage(fromWallet.sessionSigner.sign, {
         destination: toAddress,
         allocations: [{
           amount: amount,

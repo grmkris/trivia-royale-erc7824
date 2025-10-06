@@ -2,12 +2,9 @@ import { SEPOLIA_CONFIG } from "./core/contracts";
 import { NitroliteClient, SessionKeyStateSigner, createResizeChannelMessage, parseCloseAppSessionResponse, parseResizeChannelResponse, parseAnyRPCResponse, RPCMethod, createCloseAppSessionMessage, parseMessageResponse } from "@erc7824/nitrolite";
 import type { Wallet } from "./core/wallets";
 import type { Address, Chain, Hex } from "viem";
-import { connectToClearNode, authenticateClearNode, createMessageSigner } from "./rpc/connection";
+import { connectToClearNode, authenticateClearNode } from "./rpc/connection";
 import { getUSDCBalance, parseUSDC, formatUSDC, ensureAllowance } from "./core/erc20";
 import { getLedgerBalances, getChannelWithBroker, createChannelViaRPC } from "./rpc/channels";
-import { createWalletClient, http } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { sepolia } from "viem/chains";
 import type { NitroliteRPCMessage } from "@erc7824/nitrolite";
 import { logTxSubmitted } from "./core/logger";
 import { createApplicationMessage } from '@erc7824/nitrolite';
@@ -237,7 +234,7 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     publicClient: props.wallet.publicClient,
     // @ts-expect-error - wallet.walletClient is a WalletClient
     walletClient: props.wallet.walletClient,
-    stateSigner: new SessionKeyStateSigner(props.wallet.sessionPrivateKey),
+    stateSigner: props.wallet.sessionSigner.createStateSigner(),
     challengeDuration: 3600n,
     addresses: {
       custody: SEPOLIA_CONFIG.contracts.custody,
@@ -358,16 +355,8 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
       throw new Error('WebSocket not connected');
     }
 
-    const sessionSigner = createMessageSigner(
-      createWalletClient({
-        account: privateKeyToAccount(props.wallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      })
-    );
-
     // Create resize message to move custody → channel
-    const message = await createResizeChannelMessage(sessionSigner, {
+    const message = await createResizeChannelMessage(props.wallet.sessionSigner.sign, {
       channel_id: channelId,
       resize_amount: amount,           // Positive = custody → channel
       allocate_amount: 0n,              // No ledger movement
@@ -436,16 +425,8 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
       throw new Error('WebSocket not connected');
     }
 
-    const sessionSigner = createMessageSigner(
-      createWalletClient({
-        account: privateKeyToAccount(props.wallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      })
-    );
-
     // Create resize message
-    const message = await createResizeChannelMessage(sessionSigner, {
+    const message = await createResizeChannelMessage(props.wallet.sessionSigner.sign, {
       channel_id: channelId,
       resize_amount: resizeAmount,
       allocate_amount: allocateAmount,
@@ -741,14 +722,8 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
   };
 
   const signSessionRequest = async (request: NitroliteRPCMessage): Promise<string> => {
-    const signer = createMessageSigner(
-      createWalletClient({
-        account: privateKeyToAccount(props.wallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      })
-    );
-    const signature = await signer(request.req);
+    if(!request.req) throw new Error ("Missing request.req")
+    const signature = await props.wallet.sessionSigner.sign(request.req);
     return signature;
   };
 
@@ -809,15 +784,8 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
       throw new Error(`Session ${sessionId} is not active`);
     }
 
-    const signer = createMessageSigner(
-      createWalletClient({
-        account: privateKeyToAccount(props.wallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      })
-    );
     const message = await createApplicationMessage(
-      signer,
+      props.wallet.sessionSigner.sign,
       sessionId,
       { type, data }
     );
@@ -848,15 +816,7 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
 
     console.log(`\n  🔒 Closing session ${sessionId.slice(0, 10)}...`);
 
-    const signer = createMessageSigner(
-      createWalletClient({
-        account: privateKeyToAccount(props.wallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      })
-    );
-
-    const closeMsg = await createCloseAppSessionMessage(signer, {
+    const closeMsg = await createCloseAppSessionMessage(props.wallet.sessionSigner.sign, {
       app_session_id: sessionId,
       allocations: finalAllocations,
     });

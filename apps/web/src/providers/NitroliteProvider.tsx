@@ -6,7 +6,7 @@ import {
   createLocalStorageKeyManager,
   type BetterNitroliteClient
 } from '@trivia-royale/game';
-import { useWalletClient } from 'wagmi';
+import { useWalletClient, usePublicClient } from 'wagmi';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
@@ -24,12 +24,15 @@ interface NitroliteContextType {
   balances: Balances | null;
   status: 'disconnected' | 'connecting' | 'connected' | 'error';
   refreshBalances: () => Promise<void>;
+  connect: () => Promise<void>;
+  disconnect: () => void;
 }
 
 const NitroliteContext = createContext<NitroliteContextType | null>(null);
 
 export function NitroliteProvider({ children }: { children: ReactNode }) {
   const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
   const [client, setClient] = useState<BetterNitroliteClient | null>(null);
   const [balances, setBalances] = useState<Balances | null>(null);
   const [status, setStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
@@ -67,53 +70,67 @@ export function NitroliteProvider({ children }: { children: ReactNode }) {
     refetchInterval: 2000,
   });
 
-  useEffect(() => {
-    if (!walletClient?.account) {
-      setClient(null);
-      setStatus('disconnected');
-      setBalances(null);
+  // Manual connect function
+  const connect = async () => {
+    if (!walletClient || !publicClient) {
+      console.error('Wallet or public client not available');
+      setStatus('error');
       return;
     }
 
     setStatus('connecting');
 
-    // Use localStorage for persistent session keys
-    const keyManager = createLocalStorageKeyManager();
+    try {
+      // Use localStorage for persistent session keys
+      const keyManager = createLocalStorageKeyManager();
 
-    // Create wallet with persistent session keys
-    // @ts-expect-error - wagmi account is compatible with viem Account
-    const wallet = createWallet(walletClient.account, keyManager);
-
-    // Create client
-    const nitroClient = createBetterNitroliteClient({
-      wallet,
-      sessionAllowance: '0.1', // allow 0.1 USDC for app sessions
-      onAppMessage: (type, sessionId, data) => {
-        console.log('📬 App message:', type, data);
-      },
-      onSessionClosed: (sessionId) => {
-        console.log('🔒 Session closed:', sessionId);
-      }
-    });
-
-    nitroClient.connect()
-      .then(async () => {
-        setClient(nitroClient);
-        setStatus('connected');
-        await refreshBalances();
-      })
-      .catch(err => {
-        console.error('Failed to connect to ClearNode:', err);
-        setStatus('error');
+      // Create wallet with persistent session keys
+      const wallet = createWallet({
+        walletClient,
+        publicClient,
+        sessionKeyManager: keyManager
       });
 
-    return () => {
-      nitroClient.disconnect();
-    };
+      // Create client
+      const nitroClient = createBetterNitroliteClient({
+        wallet,
+        sessionAllowance: '0.1', // allow 0.1 USDC for app sessions
+        onAppMessage: (type, sessionId, data) => {
+          console.log('📬 App message:', type, data);
+        },
+        onSessionClosed: (sessionId) => {
+          console.log('🔒 Session closed:', sessionId);
+        }
+      });
+
+      await nitroClient.connect();
+      setClient(nitroClient);
+      setStatus('connected');
+      await refreshBalances();
+    } catch (err) {
+      console.error('Failed to connect to ClearNode:', err);
+      setStatus('error');
+    }
+  };
+
+  const disconnect = () => {
+    if (client) {
+      client.disconnect();
+      setClient(null);
+    }
+    setStatus('disconnected');
+    setBalances(null);
+  };
+
+  // Reset when wallet disconnects
+  useEffect(() => {
+    if (!walletClient) {
+      disconnect();
+    }
   }, [walletClient?.account?.address]);
 
   return (
-    <NitroliteContext.Provider value={{ client, balances, status, refreshBalances }}>
+    <NitroliteContext.Provider value={{ client, balances, status, refreshBalances, connect, disconnect }}>
       {children}
     </NitroliteContext.Provider>
   );

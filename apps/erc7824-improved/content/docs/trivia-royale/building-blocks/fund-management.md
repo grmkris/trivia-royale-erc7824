@@ -302,20 +302,33 @@ The session key is separate from your wallet's private key and must be **persist
 ```typescript
 // Node.js only - for browser, use createLocalStorageKeyManager
 import { createFileSystemKeyManager } from './core/key-manager-fs';
+import { createWallet } from './core/wallets';
+import { createWalletClient, createPublicClient, http } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { sepolia } from 'viem/chains';
 
 // Create key manager (persists to disk)
 const keyManager = createFileSystemKeyManager('./keys');
 
-// Get or generate session key
-let sessionKey = keyManager.getSessionKey(wallet.address);
-if (!sessionKey) {
-  sessionKey = keyManager.generateSessionKey(wallet.address);
-}
+// Create viem account and clients
+const account = privateKeyToAccount(walletPrivateKey);
 
-// Use when creating wallet/client
+const walletClient = createWalletClient({
+  account,
+  chain: sepolia,
+  transport: http(),
+});
+
+const publicClient = createPublicClient({
+  chain: sepolia,
+  transport: http(),
+});
+
+// Create wallet with session key management
 const wallet = createWallet({
-  privateKey: walletPrivateKey,
-  sessionPrivateKey: sessionKey.privateKey,
+  walletClient,
+  publicClient,
+  sessionKeyManager: keyManager
 });
 ```
 

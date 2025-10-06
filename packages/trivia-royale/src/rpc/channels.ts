@@ -17,7 +17,6 @@ BigInt.prototype["toJSON"] = function () {
 import {
   connectToClearNode,
   authenticateClearNode,
-  createMessageSigner,
 } from './connection';
 import {
   createGetLedgerBalancesMessage,
@@ -43,9 +42,7 @@ import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../core/contracts';
 import type { Wallet } from '../core/wallets';
 import { createNitroliteClient } from '../core/wallets';
 import type { Address, Hex } from 'viem';
-import { createWalletClient, http, parseUnits } from 'viem';
-import { sepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
+import { parseUnits } from 'viem';
 import { parseUSDC, ensureAllowance } from '../core/erc20';
 import { logTxSubmitted } from '../core/logger';
 
@@ -81,25 +78,12 @@ export async function createChannelViaRPC(
       // Create NitroliteClient with broker as counterparty for the 2-party state channel
       const nitroliteClient = createNitroliteClient(wallet, SEPOLIA_CONFIG.contracts.brokerAddress);
 
-      // Step 2: Prepare RPC request
-      const sessionSigner = createMessageSigner(createWalletClient({
-        account: privateKeyToAccount(wallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      }));
-
-      // sessionKey and sessionSigner should be the same
-      if (wallet.sessionAddress !== privateKeyToAccount(wallet.sessionPrivateKey).address) {
-        reject(new Error('Session key and session signer do not match'));
-        return;
-      }
-
       // Prepare channel creation parameters
       const params: CreateChannelRequestParams = {
         chain_id: SEPOLIA_CONFIG.chainId,
         token: SEPOLIA_CONFIG.contracts.tokenAddress,
         amount: amountWei, // BigInt - signer will handle serialization,
-        session_key: wallet.sessionAddress
+        session_key: wallet.sessionSigner.address
       };
 
       // Create message handler for RPC response
@@ -200,7 +184,7 @@ export async function createChannelViaRPC(
       ws.addEventListener('message', handleMessage);
 
       // Create and send RPC request
-      const message = await createCreateChannelMessage(sessionSigner, params);
+      const message = await createCreateChannelMessage(wallet.sessionSigner.sign, params);
       ws.send(message);
     } catch (error) {
       reject(error);
@@ -234,12 +218,6 @@ export async function resizeChannelViaRPC(
 
       const nitroliteClient = createNitroliteClient(wallet, SEPOLIA_CONFIG.contracts.brokerAddress);
       const amountWei = parseUSDC(additionalAmount);
-
-      const sessionSigner = createMessageSigner(createWalletClient({
-        account: privateKeyToAccount(wallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      }));
 
       // Create message handler for RPC response
       const handleMessage = async (event: MessageEvent) => {
@@ -297,7 +275,7 @@ export async function resizeChannelViaRPC(
       ws.addEventListener('message', handleMessage);
 
       // Send resize request
-      const message = await createResizeChannelMessage(sessionSigner, {
+      const message = await createResizeChannelMessage(wallet.sessionSigner.sign, {
         channel_id: channelId,
         resize_amount: amountWei,
         allocate_amount: 0n,
@@ -332,12 +310,6 @@ export async function closeChannelViaRPC(
       console.log(`  🔒 ${wallet.name}: Closing channel ${channelId.slice(0, 10)}...`);
 
       const nitroliteClient = createNitroliteClient(wallet, SEPOLIA_CONFIG.contracts.brokerAddress);
-
-      const sessionSigner = createMessageSigner(createWalletClient({
-        account: privateKeyToAccount(wallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      }));
 
       // Create message handler for RPC response
       const handleMessage = async (event: MessageEvent) => {
@@ -397,7 +369,7 @@ export async function closeChannelViaRPC(
 
       // Send close request
       const message = await createCloseChannelMessage(
-        sessionSigner,
+        wallet.sessionSigner.sign,
         channelId,
         wallet.address
       );
@@ -423,12 +395,6 @@ export async function getChannelWithBroker(
 ): Promise<Hex | null> {
   return new Promise(async (resolve, reject) => {
     try {
-      const sessionSigner = createMessageSigner(createWalletClient({
-        account: privateKeyToAccount(wallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      }));
-
       // Set up timeout
       const timeoutId = setTimeout(() => {
         ws.removeEventListener('message', handleMessage);
@@ -479,7 +445,7 @@ export async function getChannelWithBroker(
 
       // Create and send request
       const message = await createGetChannelsMessage(
-        sessionSigner,
+        wallet.sessionSigner.sign,
         wallet.address,
         RPCChannelStatus.Open
       );
@@ -529,8 +495,6 @@ export async function getLedgerBalances(
 ): Promise<Array<{ asset: string; amount: string }>> {
   return new Promise(async (resolve, reject) => {
     try {
-      const signer = createMessageSigner(wallet.walletClient);
-
       // Create message handler
       const handleMessage = (event: MessageEvent) => {
         try {
@@ -557,7 +521,7 @@ export async function getLedgerBalances(
       ws.addEventListener('message', handleMessage);
 
       // Create and send request
-      const message = await createGetLedgerBalancesMessage(signer, wallet.address);
+      const message = await createGetLedgerBalancesMessage(wallet.sessionSigner.sign, wallet.address);
       ws.send(message);
     } catch (error) {
       reject(error);
@@ -626,12 +590,6 @@ export async function transferViaLedger(
     try {
       console.log(`  💸 ${fromWallet.name}: Transferring ${amount} ${asset.toUpperCase()} to ${toAddress.slice(0, 10)}...`);
 
-      const sessionSigner = createMessageSigner(createWalletClient({
-        account: privateKeyToAccount(fromWallet.sessionPrivateKey),
-        chain: sepolia,
-        transport: http(),
-      }));
-
       // Create message handler for RPC response
       const handleMessage = async (event: MessageEvent) => {
         try {
@@ -659,7 +617,7 @@ export async function transferViaLedger(
       ws.addEventListener('message', handleMessage);
 
       // Send transfer request
-      const message = await createTransferMessage(sessionSigner, {
+      const message = await createTransferMessage(fromWallet.sessionSigner.sign, {
         destination: toAddress,
         allocations: [{
           amount: amount,
