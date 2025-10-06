@@ -26,7 +26,6 @@ import {
   stringToHex,
   keccak256,
 } from "viem";
-import { DEBUG } from "../env";
 import type { Wallet } from "../core/wallets";
 
 // ==================== TYPES ====================
@@ -105,11 +104,6 @@ export async function authenticateClearNode(
       const expireNum = Math.floor(Date.now() / 1000) + 3600;
       const expire = expireNum.toString(); // STRING for auth request (server expects string)
 
-      if (DEBUG) {
-        console.log(`  🔑 Main wallet: ${walletAddress}`);
-        console.log(`  🔐 Session key: ${wallet.sessionAddress}`);
-      }
-
       // Step 1: Send auth request with main wallet and session key
       const authRequest = await createAuthRequestMessage({
         address: walletAddress,                // Main wallet address
@@ -121,9 +115,6 @@ export async function authenticateClearNode(
         allowances,                            // Pass allowances (default: [])
       });
 
-      if (DEBUG) {
-        console.log(`  📤 Sending auth request:`, authRequest);
-      }
       ws.send(authRequest);
 
       // Step 2: Wait for challenge and authenticate
@@ -131,10 +122,6 @@ export async function authenticateClearNode(
         try {
           // Parse response using SDK parser for type safety
           const response = parseAnyRPCResponse(event.data);
-
-          if (DEBUG) {
-            console.log(`  📨 Received ${response.method}:`, response.params);
-          }
 
           switch (response.method) {
             case RPCMethod.AuthChallenge:
@@ -162,9 +149,6 @@ export async function authenticateClearNode(
                 response, // Full challenge response object
               );
 
-              if (DEBUG) {
-                console.log(`  📤 Sending auth verify message:`, authVerify);
-              }
               ws.send(authVerify);
               break;
 
@@ -172,13 +156,6 @@ export async function authenticateClearNode(
               if (response.params.success) {
                 ws.removeEventListener("message", handleMessage);
                 console.log(`  ✅ Authentication successful`);
-
-                // Store JWT if provided (debug only)
-                if (DEBUG && response.params.jwtToken) {
-                  console.log(`  🎟️  Received JWT token`);
-                  // TODO: Store JWT for future sessions
-                }
-
                 resolve();
               } else {
                 ws.removeEventListener("message", handleMessage);

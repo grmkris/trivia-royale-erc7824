@@ -33,9 +33,7 @@ import {
   convertRPCToClientState,
   RPCMethod,
   type CreateChannelRequestParams,
-  RPCChannelStatus,
   parseChannelUpdateResponse,
-  type State,
 } from '@erc7824/nitrolite';
 import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../core/contracts';
 import type { Wallet } from '../core/wallets';
@@ -45,7 +43,6 @@ import { createWalletClient, http, parseUnits } from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { parseUSDC, ensureAllowance } from '../core/erc20';
-import type { StateStorage } from '../client';
 import { logTxSubmitted } from '../core/logger';
 
 export async function getLedgerBalances(

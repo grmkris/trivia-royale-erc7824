@@ -8,14 +8,13 @@ import { getLedgerBalances, getChannelWithBroker, createChannelViaRPC } from "./
 import { createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
-import type { NitroliteRPCMessage, State } from "@erc7824/nitrolite";
+import type { NitroliteRPCMessage } from "@erc7824/nitrolite";
 import { logTxSubmitted } from "./core/logger";
 import { createApplicationMessage } from '@erc7824/nitrolite';
 import { transferViaLedger } from './rpc/ledger';
 import { NitroliteRPC } from '@erc7824/nitrolite';
 import { z } from "zod";
-import { createInMemoryStateStorage, type StateStorage } from "./storage/in-memory";
-// Generic message schema for app sessions
+
 export interface MessageSchema {
   [key: string]: {
     data: any;
@@ -143,7 +142,6 @@ export type BetterNitroliteClient<T extends MessageSchema = any> = {
 
 const createMessageHandler = <T extends MessageSchema>(props: {
   client: NitroliteClient,
-  stateStorage: StateStorage,
   wallet: Wallet,
   onAppMessage?: MessageHandler<T>,
   onSessionClosed?: (sessionId: Hex, finalAllocations: Array<{
@@ -248,24 +246,12 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     },
     chainId: SEPOLIA_CONFIG.chainId,
   });
-  const stateStorage = createInMemoryStateStorage();
 
   let status: 'connected' | 'disconnected' | 'error' = 'disconnected';
   let ws: WebSocket | null = null;
 
   // Track active sessions
   const activeSessions = new Set<Hex>();
-
-  // Create message handler with onAppMessage callback
-  const handleMessage = createMessageHandler<T>({
-    client,
-    stateStorage,
-    wallet: props.wallet,
-    onAppMessage: props.onAppMessage,
-    onSessionClosed: props.onSessionClosed,
-    activeSessions,
-    ws: null, // Will be updated when connected
-  });
 
   const connect = async () => {
     ws = await connectToClearNode(SEPOLIA_CONFIG.clearNodeUrl);
@@ -284,7 +270,6 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     // Update the handler's ws reference
     const updatedHandler = createMessageHandler<T>({
       client,
-      stateStorage,
       wallet: props.wallet,
       onAppMessage: props.onAppMessage,
       onSessionClosed: props.onSessionClosed,
@@ -397,20 +382,9 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
 
           if (response.method === RPCMethod.ResizeChannel) {
             ws!.removeEventListener('message', handleMessage);
-            // const reversedProofStates = proofStates.reverse();
 
-            // const channelData1 = await client.getChannelData(channelId);
-            // console.log(`Channel data:`, channelData1);
-            // const lastValidState = channelData1.lastValidState;
-            // const lastValidState = proofStates[0];
-            // const firstProofState = proofStates[0];
-            // if (!firstProofState) throw new Error('No proof states');
-            // const combinedProofStates = [lastValidState, {
-            //   ...firstProofState,
-            //   version: BigInt(firstProofState.version),
-            // }];
-
-            const proofStates = await stateStorage.getChannelState(channelId);
+            const channelData = await client.getChannelData(channelId);
+            const proofStates = [channelData.lastValidState];
             const parsedResponse = parseResizeChannelResponse(event.data);
             const { state, serverSignature } = parsedResponse.params;
 
@@ -428,15 +402,6 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
             });
 
             const receipt = await client.publicClient.waitForTransactionReceipt({ hash: txHash });
-            console.log(`Resize channel receipt:`, receipt);
-            // get the state from the receipt
-            const channelData2 = await client.getChannelData(channelId);
-            console.log(`Channel data:`, channelData2);
-
-            // After successful resize, clear all stored states
-            // The resize is now on-chain, so we don't need any proof states for the next resize
-            await stateStorage.appendChannelState(channelId, channelData2.lastValidState);
-            console.log(`  📝 Cleared proof states after successful on-chain resize v${channelData2.lastValidState.version}`);
             resolve();
           }
           else if (response.method === RPCMethod.Error) {
@@ -496,7 +461,8 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
           if (response.method === RPCMethod.ResizeChannel) {
             ws!.removeEventListener('message', handleMessage);
 
-            const proofStates = await stateStorage.getChannelState(channelId);
+            const channelData = await client.getChannelData(channelId);
+            const proofStates = [channelData.lastValidState];
 
             const parsedResponse = parseResizeChannelResponse(event.data);
             const { state, serverSignature } = parsedResponse.params;
@@ -515,12 +481,6 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
             });
 
             const receipt = await client.publicClient.waitForTransactionReceipt({ hash: txHash });
-
-            // After successful resize, append the new state
-            const channelData1 = await client.getChannelData(channelId);
-            console.log(`Channel data:`, channelData1);
-            await stateStorage.appendChannelState(channelId, channelData1.lastValidState);
-
             resolve();
           }
           else if (response.method === RPCMethod.Error) {
@@ -681,7 +641,7 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
       }
 
       // Create channel with wallet funds
-      const channelId = await createChannelViaRPC(ws, props.wallet, formatUSDC(amount), stateStorage);
+      const channelId = await createChannelViaRPC(ws, props.wallet, formatUSDC(amount));
       console.log(`✅ Channel created with ${formatUSDC(amount)} USDC`);
       return;
     }
@@ -736,9 +696,6 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
 
     // Now resize channel to include all custody funds
     if (totalResizeAmount > 0n) {
-      // Get proof states for resize
-      const proofStates = await stateStorage.getChannelState(channelId);
-      console.log(`  📚 Using ${proofStates.length} proof state(s) for resize`);
       await resizeChannelWithCustodyFunds(channelId, totalResizeAmount);
       console.log(`✅ Added ${formatUSDC(totalResizeAmount)} USDC to channel`);
     }

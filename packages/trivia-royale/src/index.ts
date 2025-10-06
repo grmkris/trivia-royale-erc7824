@@ -18,7 +18,10 @@ export { parseUSDC, formatUSDC } from './core/erc20';
 // Configuration
 export { SEPOLIA_CONFIG } from './core/contracts';
 
-// Storage (for browser usage)
-export { createLocalStateStorage } from './storage/local-storage';
-export { createInMemoryStateStorage } from './storage/in-memory';
-export type { StateStorage } from './storage/in-memory';
+// Key management (for persistent session keys)
+export type { KeyManager } from './core/key-manager';
+export {
+  createInMemoryKeyManager,
+  createLocalStorageKeyManager,
+  createFileSystemKeyManager
+} from './core/key-manager';

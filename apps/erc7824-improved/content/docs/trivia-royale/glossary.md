@@ -120,9 +120,7 @@ Unique identifier to prevent replay attacks. Usually `Date.now()` or incrementin
 Cryptographic proof that a participant approved a message or state. Created by signing with private key, verified with public key (address).
 
 ### Proof States
-Historical channel states used to prove the validity of state transitions during on-chain operations. Managed automatically by StateStorage.
-
-TODO@kris: Verify StateStorage implementation details
+The current on-chain channel state used to prove the validity of resize operations. Retrieved via `client.getChannelData(channelId)` - only the latest state is required. The session key must remain consistent across operations.
 
 ## State Channel Concepts
 
@@ -176,6 +174,6 @@ Lower-level SDK providing direct access to:
 
 ## Next Steps
 
-- [Core Concepts](/trivia-royale/core-concepts): Deep dive into fundamentals
-- [Building Blocks](/trivia-royale/building-blocks): Practical patterns
+- [Core Concepts](/docs/trivia-royale/core-concepts): Deep dive into fundamentals
+- [Building Blocks](/docs/trivia-royale/building-blocks): Practical patterns
 - [FAQ](./faq): Common questions answered

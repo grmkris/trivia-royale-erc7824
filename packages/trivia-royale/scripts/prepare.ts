@@ -12,13 +12,13 @@ import { mnemonicToAccount } from 'viem/accounts';
 import { formatEther, parseEther } from 'viem';
 import {
   generateNewMnemonic,
-  loadWallets,
   createPublicRpcClient,
   deriveAddress,
 } from '../src/core/wallets';
 import { SEPOLIA_CONFIG } from '../src/core/contracts';
-import { env } from '../src/env';
+import { testEnv } from './testEnv';
 import { getUSDCBalance, formatUSDC, parseUSDC } from '../src/core/erc20';
+import { loadWallets } from './testWallets';
 
 const WALLET_NAMES = ['Funding', 'Broker', 'Server', 'Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
 
@@ -49,7 +49,7 @@ async function main() {
   console.log('\n🎮 TRIVIA ROYALE - Setup\n');
 
   // Check for existing mnemonic
-  let mnemonic = env.MNEMONIC;
+  let mnemonic = testEnv.MNEMONIC;
 
   if (!mnemonic) {
     console.log('⚠️  GENERATING NEW MNEMONIC - SAVE THIS!\n');

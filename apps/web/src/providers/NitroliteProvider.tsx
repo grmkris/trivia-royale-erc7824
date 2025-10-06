@@ -1,9 +1,15 @@
 "use client";
 
-import { createBetterNitroliteClient, type BetterNitroliteClient } from '@trivia-royale/game';
+import {
+  createBetterNitroliteClient,
+  createWallet,
+  createLocalStateStorage,
+  createLocalStorageKeyManager,
+  type BetterNitroliteClient
+} from '@trivia-royale/game';
 import { useWalletClient } from 'wagmi';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { WalletClient } from 'viem';
+import { useQuery } from '@tanstack/react-query';
 
 // Balances type
 interface Balances {
@@ -22,20 +28,6 @@ interface NitroliteContextType {
 }
 
 const NitroliteContext = createContext<NitroliteContextType | null>(null);
-
-// Factory function for creating client from wagmi wallet
-const createClientFromWagmi = (walletClient: WalletClient) => {
-  return createBetterNitroliteClient({
-    wallet: walletClient, // wagmi WalletClient IS viem WalletClient!
-    sessionAllowance: '0.1', // allow 0.1 USDC for app sessions
-    onAppMessage: (type, sessionId, data) => {
-      console.log('📬 App message:', type, data);
-    },
-    onSessionClosed: (sessionId) => {
-      console.log('🔒 Session closed:', sessionId);
-    }
-  });
-};
 
 export function NitroliteProvider({ children }: { children: ReactNode }) {
   const { data: walletClient } = useWalletClient();
@@ -58,8 +50,26 @@ export function NitroliteProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Use React Query for balance polling
+  useQuery({
+    queryKey: ['nitrolite-balances', walletClient?.account?.address],
+    queryFn: async () => {
+      if (!client || status !== 'connected') return null;
+      const bal = await client.getBalances();
+      setBalances({
+        wallet: bal.wallet,
+        custodyContract: bal.custodyContract,
+        channel: bal.channel,
+        ledger: bal.ledger
+      });
+      return bal;
+    },
+    enabled: !!client && status === 'connected',
+    refetchInterval: 2000,
+  });
+
   useEffect(() => {
-    if (!walletClient) {
+    if (!walletClient?.account) {
       setClient(null);
       setStatus('disconnected');
       setBalances(null);
@@ -68,18 +78,32 @@ export function NitroliteProvider({ children }: { children: ReactNode }) {
 
     setStatus('connecting');
 
-    // Use factory to create client
-    const nitroClient = createClientFromWagmi(walletClient);
-    let interval: NodeJS.Timeout | null = null;
+    // Use localStorage for persistent session keys and state
+    const keyManager = createLocalStorageKeyManager();
+    const stateStorage = createLocalStateStorage();
+
+    // Create wallet with persistent session keys
+    // @ts-expect-error - wagmi account is compatible with viem Account
+    const wallet = createWallet(walletClient.account, keyManager);
+
+    // Create client with localStorage
+    const nitroClient = createBetterNitroliteClient({
+      wallet,
+      stateStorage,
+      sessionAllowance: '0.1', // allow 0.1 USDC for app sessions
+      onAppMessage: (type, sessionId, data) => {
+        console.log('📬 App message:', type, data);
+      },
+      onSessionClosed: (sessionId) => {
+        console.log('🔒 Session closed:', sessionId);
+      }
+    });
 
     nitroClient.connect()
       .then(async () => {
         setClient(nitroClient);
         setStatus('connected');
         await refreshBalances();
-
-        // Poll balances every 2s
-        interval = setInterval(refreshBalances, 2000);
       })
       .catch(err => {
         console.error('Failed to connect to ClearNode:', err);
@@ -87,10 +111,9 @@ export function NitroliteProvider({ children }: { children: ReactNode }) {
       });
 
     return () => {
-      if (interval) clearInterval(interval);
       nitroClient.disconnect();
     };
-  }, [walletClient]);
+  }, [walletClient?.account?.address]);
 
   return (
     <NitroliteContext.Provider value={{ client, balances, status, refreshBalances }}>

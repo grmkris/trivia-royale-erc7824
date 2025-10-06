@@ -240,50 +240,103 @@ const after = await client.getBalances();
 // Note: Channel reduced from 10 to 7 because ledger debt was settled
 ```
 
-## Proof States
+## Proof States & Resize Operations
 
-When resizing channels, you may need **proof states** - cryptographic proofs of previous channel states.
+When resizing channels, you need **proof states** - cryptographic evidence that validates the current channel state.
 
-### Why Proof States Exist
+### How Proof States Work
 
-State channels work by updating signed state off-chain. When you want to resize on-chain, you need to prove the current state is valid:
-
-```
-State v1 → State v2 → State v3 → Current State
-  ↑         ↑         ↑             ↑
-Proof     Proof     Proof    Want to resize here!
-```
-
-The channel needs a "chain of custody" showing how it got to the current state.
-
-### How BetterNitroliteClient Handles Them
-
-The `BetterNitroliteClient` automatically manages proof states via `StateStorage`:
+For resize operations, you only need the **latest on-chain state**:
 
 ```typescript
-// Internal: After each successful resize
+// Fetch current state from blockchain
 const channelData = await client.getChannelData(channelId);
-await stateStorage.appendChannelState(channelId, channelData.lastValidState);
+const proofStates = [channelData.lastValidState];
 
-// When next resize happens
-const proofStates = await stateStorage.getChannelState(channelId);
+// Use it as proof for the resize
 await client.resizeChannel({
   resizeState: newState,
-  proofStates: proofStates, // ← Proves state chain
+  proofStates: proofStates,
 });
 ```
 
-You don't need to manage this manually when using `deposit()` and `withdraw()`.
+The critical requirement is that the **session key remains consistent** across all resize operations. The same session key that created the channel must sign subsequent resizes.
 
-### Clearing Proof States
+### What BetterNitroliteClient Does
 
-After a successful on-chain resize, previous proofs become obsolete:
+The `BetterNitroliteClient` handles this automatically in `deposit()` and `withdraw()`:
 
 ```typescript
-// After successful resize transaction
-await stateStorage.appendChannelState(channelId, newOnChainState);
-// Old proof states are now safely stored on-chain
+// Inside resizeChannelWithCustodyFunds helper
+const channelData = await client.getChannelData(channelId);
+const proofStates = [channelData.lastValidState];
+
+const txHash = await client.resizeChannel({
+  resizeState: {
+    channelId,
+    intent: state.intent,
+    version: BigInt(state.version),
+    data: state.stateData,
+    allocations: state.allocations,
+    serverSignature,
+  },
+  proofStates,
+});
 ```
+
+Each resize fetches the fresh state from the contract. No history tracking required.
+
+## State Management & Session Keys
+
+### Session Key Persistence
+
+The session key is separate from your wallet's private key and must be **persisted across application restarts** to continue using existing channels.
+
+```typescript
+import { createFileSystemKeyManager } from './core/key-manager';
+
+// Create key manager (persists to disk)
+const keyManager = createFileSystemKeyManager('./keys');
+
+// Get or generate session key
+let sessionKey = keyManager.getSessionKey(wallet.address);
+if (!sessionKey) {
+  sessionKey = keyManager.generateSessionKey(wallet.address);
+}
+
+// Use when creating wallet/client
+const wallet = createWallet({
+  privateKey: walletPrivateKey,
+  sessionPrivateKey: sessionKey.privateKey,
+});
+```
+
+### Available KeyManager Types
+
+**FileSystem** (Node.js/Backend):
+```typescript
+const keyManager = createFileSystemKeyManager('./data');
+```
+
+**LocalStorage** (Browser):
+```typescript
+const keyManager = createLocalStorageKeyManager();
+```
+
+**In-Memory** (Testing only):
+```typescript
+const keyManager = createInMemoryKeyManager();
+```
+
+### Why Session Keys Matter
+
+The session key determines **channel ownership**. If you lose the session key:
+- ❌ Cannot resize existing channels
+- ❌ Cannot withdraw funds from channels
+- ❌ Must create new channel with new session key
+- ⚠️ Old channel funds require on-chain challenge to recover
+
+Always persist session keys in production applications.
 
 ## Peer-to-Peer Payments
 

@@ -1,5 +1,5 @@
 import { createBetterNitroliteClient, type MessageSchema } from "./client";
-import { loadWallets } from "./core/wallets";
+import { loadWallets } from "../scripts/testWallets";
 import { expect } from "bun:test";
 import { describe, it } from "bun:test";
 import { formatUSDC, parseUSDC } from "./core/erc20";
@@ -10,9 +10,9 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
     const wallets = loadWallets();
 
     // Setup: 3 players + 1 server for realistic gameplay
-    const player1 = wallets.test34;
-    const player2 = wallets.test35;
-    const player3 = wallets.test36;
+    const player1 = wallets.test37;
+    const player2 = wallets.test38;
+    const player3 = wallets.test39;
     const server = wallets.server;
 
     console.log('\n🎮 TRIVIA ROYALE - Full Game Simulation\n');
@@ -80,7 +80,7 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
     // Create clients with message handlers
     const client1 = createBetterNitroliteClient<TriviaGameSchema>({
       wallet: player1,
-      sessionAllowance: '0.01',
+            sessionAllowance: '0.01',
       onAppMessage: async (type, sessionId, data) => {
         messagesReceived.push({ client: 'player1', type: String(type), data });
 
@@ -119,7 +119,7 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
 
     const client2 = createBetterNitroliteClient<TriviaGameSchema>({
       wallet: player2,
-      sessionAllowance: '0.01',
+            sessionAllowance: '0.01',
       onAppMessage: async (type, sessionId, data) => {
         messagesReceived.push({ client: 'player2', type: String(type), data });
 
@@ -157,7 +157,7 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
 
     const client3 = createBetterNitroliteClient<TriviaGameSchema>({
       wallet: player3,
-      sessionAllowance: '0.01',
+            sessionAllowance: '0.01',
       onAppMessage: async (type, sessionId, data) => {
         messagesReceived.push({ client: 'player3', type: String(type), data });
 
@@ -195,7 +195,7 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
 
     const serverClient = createBetterNitroliteClient<TriviaGameSchema>({
       wallet: server,
-      onAppMessage: async (type, sessionId, data) => {
+            onAppMessage: async (type, sessionId, data) => {
         messagesReceived.push({ client: 'server', type: String(type), data });
       },
     });

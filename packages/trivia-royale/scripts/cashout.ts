@@ -14,7 +14,8 @@
  *   bun run cashout bob
  */
 
-import { loadWallets, createPublicRpcClient, createNitroliteClient, type Wallet } from '../src/core/wallets';
+import { loadWallets } from './testWallets';
+import { createPublicRpcClient, createNitroliteClient, type Wallet } from '../src/core/wallets';
 import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../src/core/contracts';
 import { connectToClearNode, authenticateClearNode } from '../src/rpc/connection';
 import {

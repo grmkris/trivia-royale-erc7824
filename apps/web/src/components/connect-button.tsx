@@ -3,12 +3,28 @@
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { Button } from "./ui/button";
 import { useNitroliteAuth } from "@/hooks/useNitroliteAuth";
+import { useState, useEffect } from "react";
+import { Skeleton } from "./ui/skeleton";
 
 export function ConnectButton() {
 	const account = useAccount();
 	const connect = useConnect();
 	const disconnect = useDisconnect();
 	const nitroliteAuth = useNitroliteAuth();
+	const [mounted, setMounted] = useState(false);
+
+	// Fix hydration mismatch by only rendering after mount
+	useEffect(() => {
+		setMounted(true);
+	}, []);
+
+	if (!mounted) {
+		return (
+			<div className="flex gap-2">
+				<Skeleton className="h-10 w-32" />
+			</div>
+		);
+	}
 
 	if (account.isConnected && account.address) {
 		return (

@@ -6,8 +6,8 @@
  * 2. USDC for game play (to Server and Players only)
  */
 
+import { loadWallets } from './testWallets';
 import {
-  loadWallets,
   createPublicRpcClient,
   type Wallet,
 } from '../src/core/wallets';

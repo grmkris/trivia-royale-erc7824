@@ -6,7 +6,13 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { createBetterNitroliteClient, createWallet, parseUSDC, formatUSDC } from '@trivia-royale/game';
+import {
+  createBetterNitroliteClient,
+  createWallet,
+  createFileSystemKeyManager,
+  parseUSDC,
+  formatUSDC
+} from '@trivia-royale/game';
 import { mnemonicToAccount } from 'viem/accounts';
 import { z } from 'zod';
 
@@ -18,8 +24,11 @@ const env = envSchema.parse(Bun.env);
 
 const account = mnemonicToAccount(env.MNEMONIC, { accountIndex: 2 });
 
+// Use FileSystem key manager for persistent session keys across server restarts
+const keyManager = createFileSystemKeyManager('./data');
+
 // @ts-expect-error - account is a valid Account
-const serverWallet = createWallet(account);
+const serverWallet = createWallet(account, keyManager);
 
 // Create server client using factory pattern
 const createServerClient = () => {

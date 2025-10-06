@@ -1,5 +1,5 @@
 import { createBetterNitroliteClient, type MessageSchema } from "./client";
-import { loadWallets } from "./core/wallets";
+import { loadWallets } from "../scripts/testWallets";
 import { expect } from "bun:test";
 import { describe, it } from "bun:test";
 // Import needed utilities
@@ -8,7 +8,7 @@ import { formatUSDC } from "./core/erc20";
 describe('BetterNitrolite', () => {
   it('should be able to get balances', async () => {
     const wallets = loadWallets();
-    const client = createBetterNitroliteClient({ wallet: wallets.test18 });
+    const client = createBetterNitroliteClient({ wallet: wallets.test37 });
     await client.connect();
     const balances = await client.getBalances();
     expect(balances).toBeDefined();
@@ -21,7 +21,7 @@ describe('BetterNitrolite', () => {
 
     // Use test10 as main wallet (should have funds)
     // Use alice as sender (should have channel and can send)
-    const testWallet = wallets.test33;
+    const testWallet = wallets.test37;
     const sender = wallets.alice;
 
 
@@ -142,8 +142,8 @@ describe('BetterNitrolite', () => {
     const wallets = loadWallets();
 
     // Create multiple clients (simulating players)
-    const player1 = wallets.test24;
-    const player2 = wallets.test25;
+    const player1 = wallets.test37;
+    const player2 = wallets.test38;
     const server = wallets.server;
 
     console.log('\n🎮 Testing Distributed Session Creation\n');
@@ -406,4 +406,31 @@ describe('BetterNitrolite', () => {
     console.log('   BetterNitroliteClient provides pure functions for session lifecycle');
     console.log('   App developers choose their coordination mechanism\n');
   }, 60000);
-});
+
+  it.only("should be able to deposit 3 times in a row", async () => {
+    const wallets = loadWallets();
+    const client = createBetterNitroliteClient({ wallet: wallets.test38 });
+    await client.connect();
+    const initialBalances = await client.getBalances();
+    await client.deposit(1000n);
+    await client.deposit(1000n);
+    await client.deposit(1000n);
+
+    await client.withdraw(400n);
+    await client.withdraw(320n);
+    await client.withdraw(240n);
+
+    await client.deposit(1000n);
+    
+    await client.withdraw(999n);
+    
+    // check balances
+      const balances = await client.getBalances();
+    expect(balances.wallet).toBe(initialBalances.wallet + 3000n - 400n - 320n - 240n + 1000n - 999n);
+    expect(balances.channel).toBe(initialBalances.channel + 3000n - 400n - 320n - 240n + 1000n - 999n);
+    expect(balances.custodyContract).toBe(initialBalances.custodyContract);
+    expect(balances.ledger).toBe(initialBalances.ledger - 400n - 320n - 240n + 1000n - 999n);
+  
+    await client.disconnect();
+    }, 600000);
+  });

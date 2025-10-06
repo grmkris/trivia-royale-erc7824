@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { parseUSDC } from '@trivia-royale/game';
 import { useNitrolite } from '@/providers/NitroliteProvider';
 import { isAddress, type Address } from 'viem';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useQuery } from '@tanstack/react-query';
 
 export function SendMoney() {
   const { client, refreshBalances, status } = useNitrolite();
@@ -12,15 +13,19 @@ export function SendMoney() {
   const [amount, setAmount] = useState('0.01');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [serverAddress, setServerAddress] = useState<string>('');
 
-  // Fetch server address on mount
-  useEffect(() => {
-    fetch('http://localhost:3002/server-address')
-      .then(r => r.json())
-      .then(data => setServerAddress(data.address))
-      .catch(err => console.error('Failed to fetch server address:', err));
-  }, []);
+  // Fetch server address with React Query (no blocking on first load)
+  const { data: serverAddress } = useQuery({
+    queryKey: ['serverAddress'],
+    queryFn: async () => {
+      const res = await fetch('http://localhost:3002/server-address');
+      if (!res.ok) throw new Error('Server not available');
+      const data = await res.json();
+      return data.address as string;
+    },
+    retry: false,
+    staleTime: Infinity, // Server address doesn't change
+  });
 
   const handleSend = async () => {
     if (!client || !isAddress(to)) {

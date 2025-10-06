@@ -47,7 +47,6 @@ import { createWalletClient, http, parseUnits } from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { parseUSDC, ensureAllowance } from '../core/erc20';
-import type { StateStorage } from '../client';
 import { logTxSubmitted } from '../core/logger';
 
 // Note: Batch connection helpers removed (connectAllParticipants, disconnectAll)
@@ -70,8 +69,7 @@ import { logTxSubmitted } from '../core/logger';
 export async function createChannelViaRPC(
   ws: WebSocket,
   wallet: Wallet,
-  amount: string = '10', // Default amount in USDC
-  stateStorage: StateStorage
+  amount: string = '10' // Default amount in USDC
 ): Promise<Hex> {
   return new Promise(async (resolve, reject) => {
     try {
@@ -141,11 +139,6 @@ export async function createChannelViaRPC(
               console.log(`  📤 ${wallet.name}: Transaction submitted: ${getEtherscanTxLink(txHash)}`);
               console.log(`  ⏳ ${wallet.name}: Waiting for confirmation...`);
 
-              // Store the initial state if storage provided
-              if (stateStorage && initialState) {
-                await stateStorage.appendChannelState(channelId, initialState);
-              }
-
               // listen for channel update event
               const handleChannelUpdate = (event: MessageEvent) => {
                 const response = parseChannelUpdateResponse(event.data);
@@ -185,18 +178,6 @@ export async function createChannelViaRPC(
             if (channelExistsMatch) {
               const existingChannelId = channelExistsMatch[1] as Hex;
               console.log(`  ℹ️  ${wallet.name}: Channel already exists, using ${existingChannelId.slice(0, 10)}...`);
-
-              // Fetch current state from blockchain and store it
-              if (stateStorage) {
-                try {
-                  const nitroliteClient = createNitroliteClient(wallet, SEPOLIA_CONFIG.contracts.brokerAddress);
-                  const channelData = await nitroliteClient.getChannelData(existingChannelId);
-                  await stateStorage.appendChannelState(existingChannelId, channelData.lastValidState);
-                  console.log(`  📝 ${wallet.name}: Stored existing channel state (v${channelData.lastValidState.version})`);
-                } catch (error) {
-                  console.error(`  ⚠️  ${wallet.name}: Failed to fetch existing channel state:`, error);
-                }
-              }
 
               resolve(existingChannelId);
             } else {

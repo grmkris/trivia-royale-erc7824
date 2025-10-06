@@ -6,6 +6,8 @@ import { useWalletClient, usePublicClient } from "wagmi";
 import {
 	createWallet,
 	createBetterNitroliteClient,
+	createLocalStateStorage,
+	createLocalStorageKeyManager,
 	SEPOLIA_CONFIG,
 	type BetterNitroliteClient
 } from "@trivia-royale/game";
@@ -21,6 +23,7 @@ export interface UseNitroliteAuthResult {
 	status: AuthStatus;
 	error: string | null;
 	client: BetterNitroliteClient | null;
+	sessionKey: string | null;
 	connectAndAuthenticate: () => void;
 	disconnect: () => void;
 }
@@ -42,12 +45,18 @@ export function useNitroliteAuth(): UseNitroliteAuthResult {
 				throw new Error("Public client not available");
 			}
 
-			// Create Wallet object from wagmi clients
-			const wallet = createWallet(walletClient.data.account);
+			// Use localStorage for persistent session keys and state
+			const keyManager = createLocalStorageKeyManager();
+			const stateStorage = createLocalStateStorage();
+
+			// Create Wallet object with persistent session keys
+			// @ts-expect-error - wagmi account is compatible with viem Account
+			const wallet = createWallet(walletClient.data.account, keyManager);
 
 			// Create BetterNitroliteClient
 			const nitroliteClient = createBetterNitroliteClient({
 				wallet,
+				stateStorage,
 				sessionAllowance: SEPOLIA_CONFIG.game.entryFee, // Allow for game sessions
 			});
 
@@ -98,6 +107,7 @@ export function useNitroliteAuth(): UseNitroliteAuthResult {
 					? String(mutation.error)
 					: null,
 		client,
+		sessionKey: client ? walletClient.data?.account?.address || null : null,
 		connectAndAuthenticate: () => mutation.mutate(),
 		disconnect,
 	};

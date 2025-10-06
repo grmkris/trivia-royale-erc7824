@@ -13,7 +13,8 @@
  *   bun run status server    # Show only Server
  */
 
-import { loadWallets, type Wallet } from '../src/core/wallets';
+import { loadWallets } from './testWallets';
+import type { Wallet } from '../src/core/wallets';
 import { NitroliteClient, ChannelStatus } from '@erc7824/nitrolite';
 import { SEPOLIA_CONFIG } from '../src/core/contracts';
 import { connectToClearNode, authenticateClearNode } from '../src/rpc/connection';

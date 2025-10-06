@@ -462,5 +462,5 @@ const client = createBetterNitroliteClient({
 ## Next Steps
 
 - **[Error Handling](./error-handling)**: Handle failures gracefully
-- **[Building Blocks](/trivia-royale/building-blocks)**: Deep dive into each pattern
-- **[Core Concepts](/trivia-royale/core-concepts)**: Understand the fundamentals
+- **[Building Blocks](/docs/trivia-royale/building-blocks)**: Deep dive into each pattern
+- **[Core Concepts](/docs/trivia-royale/core-concepts)**: Understand the fundamentals
