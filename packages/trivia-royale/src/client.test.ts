@@ -412,6 +412,10 @@ describe('BetterNitrolite', () => {
     const client = createBetterNitroliteClient({ wallet: wallets.test38 });
     await client.connect();
     const initialBalances = await client.getBalances();
+    console.log('Initial balances:', {
+      initialBalances,
+      address: wallets.test38.address,
+    });
     await client.deposit(1000n);
     await client.deposit(1000n);
     await client.deposit(1000n);

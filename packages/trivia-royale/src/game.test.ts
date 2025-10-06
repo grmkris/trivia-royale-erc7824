@@ -239,11 +239,11 @@ describe('BetterNitrolite - Multi-Round Trivia Game', () => {
         await client.deposit(MIN_CHANNEL_BALANCE);
         console.log(`   ✅ ${name}: Channel created\n`);
       } else if (balances.channel < MIN_CHANNEL_BALANCE) {
-        // Channel exists but insufficient funds - error
-        throw new Error(
-          `${name} has insufficient channel balance: ` +
-          `${formatUSDC(balances.channel)} (need ${formatUSDC(MIN_CHANNEL_BALANCE)})`
-        );
+        // Channel exists but insufficient funds - add more
+        const needed = MIN_CHANNEL_BALANCE - balances.channel;
+        console.log(`   📊 ${name}: Insufficient balance, adding ${formatUSDC(needed)} USDC...`);
+        await client.deposit(needed);
+        console.log(`   ✅ ${name}: Channel topped up\n`);
       } else {
         console.log(`   ✅ ${name}: Has ${formatUSDC(balances.channel)} USDC (sufficient)\n`);
       }

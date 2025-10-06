@@ -6,7 +6,7 @@
 
 // Client factory + types
 export { createBetterNitroliteClient } from './client';
-export type { BetterNitroliteClient, MessageSchema, SessionInvite } from './client';
+export type { BetterNitroliteClient, MessageSchema, SessionInvite, MessageHandler } from './client';
 
 // Wallet helper for backends
 export { createWallet } from './core/wallets';

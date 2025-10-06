@@ -19,7 +19,7 @@ export interface MessageSchema {
 }
 
 // Type helper for message handler
-type MessageHandler<T extends MessageSchema> = <K extends keyof T>(
+export type MessageHandler<T extends MessageSchema> = <K extends keyof T>(
   type: K,
   sessionId: Hex,
   data: T[K]['data']
@@ -134,6 +134,10 @@ export type BetterNitroliteClient<T extends MessageSchema = any> = {
       amount: string;
     }>
   ) => Promise<void>;
+  /**
+   * Message handler for app messages (can be set dynamically)
+   */
+  onAppMessage?: MessageHandler<T>;
 }
 
 
@@ -150,34 +154,50 @@ const createMessageHandler = <T extends MessageSchema>(props: {
   ws: WebSocket | null,
 }) => {
   return async (event: MessageEvent) => {
+    console.log('🔍 [WS] Message received:', event.data.substring(0, 100) + '...');
     try {
       const response = parseAnyRPCResponse(event.data);
+      console.log('🔍 [WS] Parsed method:', response.method);
       switch (response.method) {
         case RPCMethod.Message:
+          console.log('🔍 [WS] RPCMethod.Message detected');
+          console.log('🔍 [WS] Full response object:', JSON.stringify(response, null, 2));
+          console.log('🔍 [WS] response.params:', JSON.stringify(response.params, null, 2));
           const MessageResponseSchema = z.object({
             app_session_id: z.custom<Hex>(),
             message: z.object({
               type: z.string(),
-              data: z.unknown(),  
+              data: z.unknown(),
             }),
           });
           const parsedResponse = MessageResponseSchema.safeParse(response.params);
           if (!parsedResponse.success) {
-            // console.error('Invalid message response:', parsedSafe.error);
+            console.error('🔍 [WS] Invalid message schema:', parsedResponse.error);
+            console.error('🔍 [WS] Expected: { app_session_id, message: { type, data } }');
+            console.error('🔍 [WS] Got:', response.params);
             break;
           }
+          console.log('🔍 [WS] Message schema valid:', parsedResponse.data);
           // Handle application messages
-          if (props.onAppMessage && parsedResponse.success) {
+          if (parsedResponse.success) {
             const { app_session_id, message } = parsedResponse.data;
             if (message && app_session_id) {
               const messageType = message.type;
               const messageData = message.data || {};
+              console.log(`🔍 [WS] Processing message type="${messageType}" sessionId=${app_session_id.slice(0, 10)}...`);
               // Auto-join session when receiving first message
               if (!props.activeSessions.has(app_session_id)) {
                 props.activeSessions.add(app_session_id);
               }
-              // Call user's handler
-              await props.onAppMessage(messageType, app_session_id, messageData);
+
+              // Call handler if provided (for backward compatibility)
+              if (props.onAppMessage) {
+                console.log('🔍 [WS] Calling onAppMessage handler');
+                await props.onAppMessage(messageType, app_session_id, messageData);
+                console.log('🔍 [WS] onAppMessage completed');
+              } else {
+                console.log('🔍 [WS] No handler provided, message processed');
+              }
             }
           }
           break;
@@ -655,11 +675,15 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
       await ensureAllowance(props.wallet, SEPOLIA_CONFIG.contracts.custody as Address, walletToUse);
 
       // Deposit to custody, then resize to include custody funds
-      await client.deposit(
+      const depositTxHash = await client.deposit(
         SEPOLIA_CONFIG.contracts.tokenAddress as Address,
         walletToUse
       );
       console.log(`  ✅ Deposited ${formatUSDC(walletToUse)} to custody`);
+
+      // Wait for deposit transaction to be confirmed on-chain
+      await client.publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+      console.log(`  ✅ Deposit confirmed on-chain`);
     }
 
     // Now resize channel to include all custody funds
@@ -868,5 +892,6 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     sendMessage,
     getActiveSessions,
     closeSession,
+    onAppMessage: props.onAppMessage,
   };
 };

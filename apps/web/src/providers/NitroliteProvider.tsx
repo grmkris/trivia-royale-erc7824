@@ -4,11 +4,13 @@ import {
   createBetterNitroliteClient,
   createWallet,
   createLocalStorageKeyManager,
-  type BetterNitroliteClient
+  type BetterNitroliteClient,
+  type TriviaGameSchema
 } from '@trivia-royale/game';
 import { useWalletClient, usePublicClient } from 'wagmi';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useGameStore } from '@/stores/gameStore';
 
 // Balances type
 interface Balances {
@@ -20,7 +22,7 @@ interface Balances {
 
 // Context type
 interface NitroliteContextType {
-  client: BetterNitroliteClient | null;
+  client: BetterNitroliteClient<TriviaGameSchema> | null;
   balances: Balances | null;
   status: 'disconnected' | 'connecting' | 'connected' | 'error';
   refreshBalances: () => Promise<void>;
@@ -33,7 +35,7 @@ const NitroliteContext = createContext<NitroliteContextType | null>(null);
 export function NitroliteProvider({ children }: { children: ReactNode }) {
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
-  const [client, setClient] = useState<BetterNitroliteClient | null>(null);
+  const [client, setClient] = useState<BetterNitroliteClient<TriviaGameSchema> | null>(null);
   const [balances, setBalances] = useState<Balances | null>(null);
   const [status, setStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
 
@@ -91,12 +93,13 @@ export function NitroliteProvider({ children }: { children: ReactNode }) {
         sessionKeyManager: keyManager
       });
 
-      // Create client
-      const nitroClient = createBetterNitroliteClient({
+      // Create client with gameStore message handler
+      const nitroClient = createBetterNitroliteClient<TriviaGameSchema>({
         wallet,
         sessionAllowance: '0.1', // allow 0.1 USDC for app sessions
         onAppMessage: (type, sessionId, data) => {
-          console.log('📬 App message:', type, data);
+          // Call gameStore handler directly - no React re-render issues!
+          useGameStore.getState().handleGameMessage(type, sessionId, data);
         },
         onSessionClosed: (sessionId) => {
           console.log('🔒 Session closed:', sessionId);

@@ -13,36 +13,13 @@ BigInt.prototype["toJSON"] = function () {
 };
 
 import {
-  connectToClearNode,
-  authenticateClearNode,
-} from './connection';
-import {
   createGetLedgerBalancesMessage,
-  createCreateChannelMessage,
-  createGetChannelsMessage,
-  createResizeChannelMessage,
-  createCloseChannelMessage,
   createTransferMessage,
   parseAnyRPCResponse,
-  parseCreateChannelResponse,
-  parseGetChannelsResponse,
-  parseResizeChannelResponse,
-  parseCloseChannelResponse,
-  convertRPCToClientChannel,
-  convertRPCToClientState,
   RPCMethod,
-  type CreateChannelRequestParams,
-  parseChannelUpdateResponse,
 } from '@erc7824/nitrolite';
-import { SEPOLIA_CONFIG, getEtherscanTxLink } from '../core/contracts';
 import type { Wallet } from '../core/wallets';
-import { createNitroliteClient } from '../core/wallets';
-import type { Address, Hex } from 'viem';
-import { createWalletClient, http, parseUnits } from 'viem';
-import { sepolia } from 'viem/chains';
-import { privateKeyToAccount } from 'viem/accounts';
-import { parseUSDC, ensureAllowance } from '../core/erc20';
-import { logTxSubmitted } from '../core/logger';
+import type { Address } from 'viem';
 
 export async function getLedgerBalances(
   ws: WebSocket,

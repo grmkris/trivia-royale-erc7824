@@ -3,7 +3,7 @@
  * Used by both frontend and backend
  */
 
-import type { Address } from 'viem';
+import type { Address, Hex } from 'viem';
 import type { MessageSchema } from './client';
 
 /**
@@ -43,7 +43,7 @@ export interface LobbyState {
   maxPlayers: number;
   status: 'waiting' | 'collecting_signatures' | 'starting' | 'in_progress';
   sessionRequest?: any; // SessionRequest type from Nitrolite
-  sessionId?: string;
+  sessionId?: Hex;
 }
 
 /**
@@ -58,7 +58,7 @@ export interface SignatureSubmission {
  * Game state
  */
 export interface GameState {
-  sessionId: string;
+  sessionId: Hex;
   currentRound: number;
   totalRounds: number;
   scores: Record<Address, number>;

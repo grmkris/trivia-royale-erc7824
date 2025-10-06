@@ -1,48 +1,38 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { useNitrolite } from '@/providers/NitroliteProvider';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { Skeleton } from './ui/skeleton';
-import type { LobbyState, TriviaGameSchema } from '@trivia-royale/game';
-import type { Address } from 'viem';
-
-type GamePhase = 'lobby' | 'signing' | 'playing' | 'results' | 'idle';
-
-interface QuestionData {
-  text: string;
-  round: number;
-}
-
-interface RoundResult {
-  winner: Address;
-  correctAnswer: string;
-  round: number;
-}
-
-interface GameOver {
-  finalWinner: Address;
-  scores: Record<string, number>;
-}
+import { useNitrolite } from '@/providers/NitroliteProvider';
+import { useGameStore } from '@/stores/gameStore';
 
 export function TriviaGame() {
   const { address } = useAccount();
-  const { client, status: nitroliteStatus } = useNitrolite();
+  const { client, status } = useNitrolite();
 
-  const [phase, setPhase] = useState<GamePhase>('idle');
-  const [lobby, setLobby] = useState<LobbyState | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Game state
-  const [currentQuestion, setCurrentQuestion] = useState<QuestionData | null>(null);
-  const [answer, setAnswer] = useState('');
-  const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
-  const [gameOver, setGameOver] = useState<GameOver | null>(null);
-  const [scores, setScores] = useState<Record<string, number>>({});
+  // Get all state from Zustand store
+  const {
+    phase,
+    lobby,
+    loading,
+    error,
+    currentQuestion,
+    answer,
+    roundResult,
+    gameOver,
+    scores,
+    countdown,
+    setPhase,
+    setLobby,
+    setLoading,
+    setError,
+    setAnswer,
+    setCountdown,
+    resetGame,
+  } = useGameStore();
 
   // Poll lobby state when waiting
   useEffect(() => {
@@ -67,54 +57,23 @@ export function TriviaGame() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [phase, address]);
+  }, [phase, address, setLobby, setPhase]);
 
-  // Listen for game messages
+  // Countdown timer between rounds
   useEffect(() => {
-    if (!client) return;
+    if (countdown === null || countdown <= 0) return;
 
-    // Store original handler
-    const originalHandler = (client as any)._onAppMessage;
-
-    // Wrap with our game handler
-    (client as any)._onAppMessage = async (type: keyof TriviaGameSchema, sessionId: string, data: any) => {
-      console.log('📬 Game message:', type, data);
-
-      if (type === 'game_start') {
-        setPhase('playing');
-        setScores({});
-        setRoundResult(null);
-        setGameOver(null);
-        // CRITICAL: Capture sessionId so we can send answers
-        setLobby(prev => prev ? {...prev, sessionId} : null);
-      } else if (type === 'question') {
-        setCurrentQuestion(data as QuestionData);
-        setAnswer('');
-        setRoundResult(null);
-      } else if (type === 'round_result') {
-        setRoundResult(data as RoundResult);
-        // Update scores
-        const result = data as RoundResult;
-        setScores(prev => ({
-          ...prev,
-          [result.winner]: (prev[result.winner] || 0) + 1,
-        }));
-      } else if (type === 'game_over') {
-        setGameOver(data as GameOver);
-        setPhase('results');
+    const timer = setInterval(() => {
+      const current = useGameStore.getState().countdown;
+      if (current === null || current <= 1) {
+        setCountdown(null);
+      } else {
+        setCountdown(current - 1);
       }
+    }, 1000);
 
-      // Call original handler if it exists
-      if (originalHandler) {
-        await originalHandler(type, sessionId, data);
-      }
-    };
-
-    return () => {
-      // Restore original handler
-      (client as any)._onAppMessage = originalHandler;
-    };
-  }, [client]);
+    return () => clearInterval(timer);
+  }, [countdown, setCountdown]);
 
   const handleJoinGame = async () => {
     if (!address || !client) return;
@@ -216,16 +175,16 @@ export function TriviaGame() {
 
         <Button
           onClick={handleJoinGame}
-          disabled={loading || nitroliteStatus !== 'connected'}
+          disabled={loading || status !== 'connected'}
           className="w-full h-12"
           size="lg"
         >
           {loading ? 'Joining...' : 'Join Game'}
         </Button>
 
-        {nitroliteStatus !== 'connected' && (
+        {status !== 'connected' && (
           <p className="text-xs text-center text-muted-foreground">
-            Connect to ClearNode first
+            {status === 'connecting' ? 'Connecting...' : 'Not connected'}
           </p>
         )}
       </Card>
@@ -360,10 +319,20 @@ export function TriviaGame() {
           </div>
         )}
 
-        {!currentQuestion && (
+        {!currentQuestion && !countdown && (
           <p className="text-center text-sm text-muted-foreground">
             Waiting for next round...
           </p>
+        )}
+
+        {/* Countdown between rounds */}
+        {countdown !== null && countdown > 0 && (
+          <div className="p-6 text-center space-y-2 animate-pulse">
+            <p className="text-sm text-muted-foreground">Next round in</p>
+            <div className="text-6xl font-bold text-primary">
+              {countdown}
+            </div>
+          </div>
         )}
       </Card>
     );
@@ -415,15 +384,7 @@ export function TriviaGame() {
         </div>
 
         <Button
-          onClick={() => {
-            setPhase('idle');
-            setLobby(null);
-            setCurrentQuestion(null);
-            setAnswer('');
-            setRoundResult(null);
-            setGameOver(null);
-            setScores({});
-          }}
+          onClick={resetGame}
           className="w-full"
         >
           Play Again
