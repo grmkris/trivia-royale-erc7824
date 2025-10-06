@@ -57,7 +57,7 @@ This might seem complex at first, but each layer serves a critical purpose:
 The `getBalances()` method returns all four balance types:
 
 ```typescript twoslash
-import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { BetterNitroliteClient } from '@trivia-royale/game';
 
 declare const client: BetterNitroliteClient;
 declare function formatUSDC(amount: bigint): string;
@@ -108,11 +108,11 @@ graph LR
 **Example: Preparing 10 USDC for a game**
 
 ```typescript twoslash
-import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
 
 declare const client: BetterNitroliteClient;
-declare function parseUSDC(amount: string): bigint;
-
+// ---cut---
 // Step 1: Start with wallet balance
 const before = await client.getBalances();
 //    ^?

@@ -139,12 +139,23 @@ The `send()` operation:
 
 ### 3. Channel Required for Sending
 Alice needs a channel to send. Bob doesn't need one to receive:
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
+import type { Address } from 'viem';
+
+declare const aliceClient: BetterNitroliteClient;
+declare const bobClient: BetterNitroliteClient;
+declare const bobAddress: Address;
+declare const aliceAddress: Address;
+declare const amount: bigint;
+// ---cut---
 // ✓ Works: Alice has channel
-await aliceClient.send({ to: bob.address, amount });
+await aliceClient.send({ to: bobAddress, amount });
+//                ^?
 
 // ✗ Fails: Bob has no channel
-await bobClient.send({ to: alice.address, amount });
+await bobClient.send({ to: aliceAddress, amount });
 // Error: No channel exists
 ```
 
@@ -160,18 +171,28 @@ When Bob withdraws, the system automatically:
 
 Both parties can send if both have channels:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
+import type { Address } from 'viem';
+
+declare const aliceClient: BetterNitroliteClient;
+declare const bobClient: BetterNitroliteClient;
+declare const aliceAddress: Address;
+declare const bobAddress: Address;
+// ---cut---
 // Both deposit
 await aliceClient.deposit(parseUSDC('10'));
+//           ^?
 await bobClient.deposit(parseUSDC('10'));
 
 // Alice sends 3 to Bob
-await aliceClient.send({ to: bob.address, amount: parseUSDC('3') });
+await aliceClient.send({ to: bobAddress, amount: parseUSDC('3') });
 // Alice ledger: -3, Bob ledger: +3
 
 // Bob sends 1 back to Alice
-await bobClient.send({ to: alice.address, amount: parseUSDC('1') });
-// Alice ledger: -2, Bob ledger: +2
+await bobClient.send({ to: aliceAddress, amount: parseUSDC('1') });
+// Bob ledger: +2, Alice ledger: -2
 
 // Net position: Alice sent 2 USDC to Bob
 ```
@@ -180,8 +201,16 @@ await bobClient.send({ to: alice.address, amount: parseUSDC('1') });
 
 Ledger balances accumulate:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
+import type { Address } from 'viem';
+
+declare const client: BetterNitroliteClient;
+declare const recipient: Address;
+// ---cut---
 await client.send({ to: recipient, amount: parseUSDC('1') });
+//           ^?
 // Ledger: -1
 
 await client.send({ to: recipient, amount: parseUSDC('2') });
@@ -195,8 +224,16 @@ await client.send({ to: recipient, amount: parseUSDC('0.5') });
 
 Prevent errors by checking capacity:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
+import type { Address } from 'viem';
+
+declare const client: BetterNitroliteClient;
+declare const recipient: Address;
+// ---cut---
 const balances = await client.getBalances();
+//    ^?
 const available = balances.channel + balances.ledger;
 
 const amount = parseUSDC('5');
@@ -205,6 +242,7 @@ if (Math.abs(Number(balances.ledger - amount)) > Number(balances.channel)) {
   console.error('Insufficient channel capacity');
 } else {
   await client.send({ to: recipient, amount });
+  //           ^?
 }
 ```
 

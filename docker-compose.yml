@@ -85,9 +85,7 @@ services:
         condition: service_healthy
 
   clearnode:
-    build:
-      context: ../nitrolite/clearnode
-      dockerfile: Dockerfile
+    image: kristjangrm/clearnode:latest
     ports:
       - "8000:8000"
       - "4242:4242"
