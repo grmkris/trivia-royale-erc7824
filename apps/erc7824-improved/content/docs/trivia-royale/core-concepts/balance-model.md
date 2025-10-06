@@ -56,14 +56,21 @@ This might seem complex at first, but each layer serves a critical purpose:
 
 The `getBalances()` method returns all four balance types:
 
-```typescript
+```typescript twoslash
+import { BetterNitroliteClient } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+declare function formatUSDC(amount: bigint): string;
+
 const balances = await client.getBalances();
+//    ^?
 
 console.log({
-  wallet: formatUSDC(balances.wallet),           // Layer 1
-  custodyContract: formatUSDC(balances.custodyContract), // Layer 2
-  channel: formatUSDC(balances.channel),         // Layer 3
-  ledger: formatUSDC(balances.ledger),           // Layer 4
+  wallet: formatUSDC(balances.wallet),
+  //                         ^?
+  custodyContract: formatUSDC(balances.custodyContract),
+  channel: formatUSDC(balances.channel),
+  ledger: formatUSDC(balances.ledger),
 });
 
 // Example output:
@@ -100,13 +107,20 @@ graph LR
 
 **Example: Preparing 10 USDC for a game**
 
-```typescript
+```typescript twoslash
+import { BetterNitroliteClient } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+declare function parseUSDC(amount: string): bigint;
+
 // Step 1: Start with wallet balance
 const before = await client.getBalances();
+//    ^?
 // { wallet: 100, custody: 0, channel: 0, ledger: 0 }
 
 // Step 2: Deposit moves: wallet → custody → channel
 await client.deposit(parseUSDC('10'));
+//           ^?
 const after = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 10, ledger: 0 }
 // Note: deposit() does BOTH wallet→custody AND custody→channel
@@ -138,14 +152,20 @@ graph RL
 
 **Example: Withdrawing all funds**
 
-```typescript
+```typescript twoslash
+import { BetterNitroliteClient } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+
 const balances = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 8, ledger: 2 }
 
 const totalAvailable = balances.channel + balances.ledger + balances.custodyContract;
+//    ^?
 // Total we can withdraw: 10 USDC
 
 await client.withdraw(totalAvailable);
+//           ^?
 // This does MULTIPLE operations automatically:
 // 1. Deallocates ledger → channel (if ledger > 0)
 // 2. Resizes channel → custody (drains channel)
@@ -160,9 +180,15 @@ const afterWithdraw = await client.getBalances();
 
 ### Pattern 1: Depositing for the First Time
 
-```typescript
+```typescript twoslash
+import { BetterNitroliteClient } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+declare function parseUSDC(amount: string): bigint;
+
 // You have: { wallet: 100, custody: 0, channel: 0, ledger: 0 }
 await client.deposit(parseUSDC('10'));
+//           ^?
 // You now have: { wallet: 90, custody: 0, channel: 10, ledger: 0 }
 
 // The deposit() method:
@@ -186,9 +212,17 @@ await client.deposit(parseUSDC('5'));
 
 ### Pattern 3: Sending Peer-to-Peer Payment
 
-```typescript
+```typescript twoslash
+import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { Address } from 'viem';
+
+declare const client: BetterNitroliteClient;
+declare const recipient: Address;
+declare function parseUSDC(amount: string): bigint;
+
 // You have: { wallet: 90, custody: 0, channel: 10, ledger: 0 }
 await client.send({ to: recipient, amount: parseUSDC('1') });
+//           ^?
 
 // After send, ledger shows -1, but channel unchanged:
 // { wallet: 90, custody: 0, channel: 10, ledger: -1 }
@@ -225,12 +259,21 @@ Your ledger balance is a **net position** across all your off-chain activity:
 
 **Understanding negative ledger balances**:
 
-```typescript
+```typescript twoslash
+import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { Address } from 'viem';
+
+declare const client: BetterNitroliteClient;
+declare const recipient: Address;
+declare function parseUSDC(amount: string): bigint;
+
 // You have a channel with 10 USDC
-const balances = { channel: 10, ledger: 0 };
+const balances = { channel: 10n, ledger: 0n };
+//    ^?
 
 // You can send up to 10 USDC (making ledger -10)
 await client.send({ to: recipient, amount: parseUSDC('7') });
+//           ^?
 // → { channel: 10, ledger: -7 } ✓ Valid
 
 // You cannot send more than your channel capacity
@@ -273,16 +316,25 @@ The `BetterNitroliteClient` handles complexity for you:
 
 Let's trace funds through a realistic scenario:
 
-```typescript
+```typescript twoslash
+import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { Address } from 'viem';
+declare const client: BetterNitroliteClient;
+declare const player2: Address;
+declare const balances: { wallet: bigint; custodyContract: bigint; channel: bigint; ledger: bigint };
+declare function parseUSDC(amount: string): bigint;
+
 // Starting state
 // { wallet: 100, custody: 0, channel: 0, ledger: 0 }
 
 // 1. Deposit 10 USDC to play a game
 await client.deposit(parseUSDC('10'));
+//           ^?
 // { wallet: 90, custody: 0, channel: 10, ledger: 0 }
 
 // 2. Send 3 USDC to another player
 await client.send({ to: player2, amount: parseUSDC('3') });
+//           ^?
 // { wallet: 90, custody: 0, channel: 10, ledger: -3 }
 //                                               ↑ negative!
 
@@ -293,7 +345,9 @@ await client.send({ to: player2, amount: parseUSDC('3') });
 
 // 4. Withdraw everything
 const total = balances.channel + balances.ledger; // 10 + 2 = 12
+//    ^?
 await client.withdraw(total);
+//           ^?
 // { wallet: 102, custody: 0, channel: 0, ledger: 0 }
 //          ↑ gained 2 USDC!
 ```

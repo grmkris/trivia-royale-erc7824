@@ -8,7 +8,6 @@
     "start": "next start"
   },
   "dependencies": {
-    "@erc7824/nitrolite": "^0.3.0",
     "@trivia-royale/game": "workspace:*",
     "@tanstack/react-form": "^1.23.5",
     "@tanstack/react-query": "^5.90.2",

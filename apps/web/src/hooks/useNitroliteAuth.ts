@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { useWalletClient } from "wagmi";
-import type { Hex } from "viem";
-import { connectToClearNode, authenticateClearNode } from "@/lib/nitrolite/actions/authenticateClearNode";
-import { createNitroliteClient, type NitroliteClient } from "@/lib/nitrolite/createNitroliteClient";
+import { useWalletClient, usePublicClient } from "wagmi";
+import {
+	createWallet,
+	createBetterNitroliteClient,
+	SEPOLIA_CONFIG,
+	type BetterNitroliteClient
+} from "@trivia-royale/game";
 
 export type AuthStatus =
 	| "idle"
 	| "connecting"
-	| "signing"
 	| "authenticating"
 	| "authenticated"
 	| "error";
@@ -18,52 +20,53 @@ export type AuthStatus =
 export interface UseNitroliteAuthResult {
 	status: AuthStatus;
 	error: string | null;
-	client: NitroliteClient | null;
+	client: BetterNitroliteClient | null;
 	connectAndAuthenticate: () => void;
 	disconnect: () => void;
 }
 
 export function useNitroliteAuth(): UseNitroliteAuthResult {
 	const walletClient = useWalletClient();
+	const publicClient = usePublicClient();
+	const [client, setClient] = useState<BetterNitroliteClient | null>(null);
 	const [intermediateStatus, setIntermediateStatus] = useState<
-		"connecting" | "signing" | "authenticating" | null
+		"connecting" | "authenticating" | null
 	>(null);
-	const [ws, setWs] = useState<WebSocket | null>(null);
 
 	const mutation = useMutation({
 		mutationFn: async () => {
-			if (!walletClient.data) {
+			if (!walletClient.data?.account) {
 				throw new Error("Wallet not connected");
 			}
-
-			// Step 1: Connect to ClearNode
-			setIntermediateStatus("connecting");
-			console.log("Connecting to ClearNode...");
-			const websocket = await connectToClearNode();
-			setWs(websocket);
-
-			// Step 2: Authenticate (signing happens here)
-			setIntermediateStatus("signing");
-			console.log("Authenticating with ClearNode...");
-
-			setIntermediateStatus("authenticating");
-			const result = await authenticateClearNode(websocket, walletClient.data);
-
-			if (!result.success) {
-				throw new Error("Authentication failed");
+			if (!publicClient) {
+				throw new Error("Public client not available");
 			}
 
-			setIntermediateStatus(null);
-			console.log("✅ Successfully authenticated with ClearNode");
+			// Create Wallet object from wagmi clients
+			const wallet = createWallet(walletClient.data.account);
 
-			return result;
+			// Create BetterNitroliteClient
+			const nitroliteClient = createBetterNitroliteClient({
+				wallet,
+				sessionAllowance: SEPOLIA_CONFIG.game.entryFee, // Allow for game sessions
+			});
+
+			// Connect (handles WebSocket + authentication internally)
+			setIntermediateStatus("connecting");
+			await nitroliteClient.connect();
+			setIntermediateStatus("authenticating");
+
+			setIntermediateStatus(null);
+			setClient(nitroliteClient);
+
+			return nitroliteClient;
 		},
 		onError: () => {
 			setIntermediateStatus(null);
-			// Cleanup WebSocket on error
-			if (ws) {
-				ws.close();
-				setWs(null);
+			// Cleanup on error
+			if (client) {
+				client.disconnect().catch(console.error);
+				setClient(null);
 			}
 		},
 	});
@@ -78,22 +81,13 @@ export function useNitroliteAuth(): UseNitroliteAuthResult {
 				: "idle";
 
 	const disconnect = () => {
-		if (ws) {
-			ws.close();
-			setWs(null);
+		if (client) {
+			client.disconnect().catch(console.error);
+			setClient(null);
 		}
 		setIntermediateStatus(null);
 		mutation.reset();
 	};
-
-	// Create client instance when authenticated
-	const client =
-		mutation.isSuccess &&
-		ws &&
-		walletClient.data &&
-		mutation.data?.sessionPrivateKey
-			? createNitroliteClient(ws, walletClient.data, mutation.data.sessionPrivateKey)
-			: null;
 
 	return {
 		status,

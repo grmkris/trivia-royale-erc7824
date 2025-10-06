@@ -72,61 +72,20 @@ sequenceDiagram
 3. Order is preserved per-sender, but not globally
 4. You must filter your own messages in handlers
 
-## Defining Message Schemas
+## Message Structure
 
-Use TypeScript interfaces to define your application's message types:
+Messages are JSON objects sent via the `onAppMessage` handler. You can optionally use TypeScript interfaces:
 
 ```typescript
-import { MessageSchema } from './client';
-import type { Address } from 'viem';
-
-interface TriviaGameSchema extends MessageSchema {
-  // Each key is a message type
-  game_start: {
-    data: {
-      totalRounds: number;
-      entryFee: string;
-    };
-  };
-
+interface GameSchema extends MessageSchema {
   question: {
-    data: {
-      text: string;
-      round: number;
-    };
+    data: { text: string; round: number };
   };
-
   answer: {
-    data: {
-      answer: string;
-      round: number;
-      from: Address;
-      timestamp: number;
-    };
-  };
-
-  round_result: {
-    data: {
-      winner: Address;
-      correctAnswer: string;
-      round: number;
-    };
-  };
-
-  game_over: {
-    data: {
-      finalWinner: Address;
-      scores: Record<string, number>;
-    };
+    data: { answer: string; from: Address; timestamp: number };
   };
 }
 ```
-
-**Benefits of typed schemas**:
-- TypeScript autocomplete for message data
-- Compile-time type checking
-- Self-documenting message format
-- Prevents typos in message types
 
 ## Handling Messages
 

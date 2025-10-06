@@ -14,3 +14,11 @@ export type { Wallet } from './core/wallets';
 
 // USDC utilities
 export { parseUSDC, formatUSDC } from './core/erc20';
+
+// Configuration
+export { SEPOLIA_CONFIG } from './core/contracts';
+
+// Storage (for browser usage)
+export { createLocalStateStorage } from './storage/local-storage';
+export { createInMemoryStateStorage } from './storage/in-memory';
+export type { StateStorage } from './storage/in-memory';

@@ -8,8 +8,12 @@
     "build": "bun build src/index.ts --outdir=dist"
   },
   "dependencies": {
-    "hono": "^4.8.0",
     "@trivia-royale/game": "workspace:*",
-    "viem": "^2.37.12"
+    "hono": "^4.8.0",
+    "viem": "^2.37.12",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.23"
   }
 }

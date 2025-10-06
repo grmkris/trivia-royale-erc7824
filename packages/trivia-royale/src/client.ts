@@ -9,12 +9,12 @@ import { createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import type { NitroliteRPCMessage, State } from "@erc7824/nitrolite";
-import fs from "fs";
 import { logTxSubmitted } from "./core/logger";
 import { createApplicationMessage } from '@erc7824/nitrolite';
 import { transferViaLedger } from './rpc/ledger';
 import { NitroliteRPC } from '@erc7824/nitrolite';
 import { z } from "zod";
+import { createInMemoryStateStorage, type StateStorage } from "./storage/in-memory";
 // Generic message schema for app sessions
 export interface MessageSchema {
   [key: string]: {
@@ -139,67 +139,6 @@ export type BetterNitroliteClient<T extends MessageSchema = any> = {
     }>
   ) => Promise<void>;
 }
-
-export type StateStorage = {
-  getChannelState: (channelId: Hex) => Promise<State[]>;
-  appendChannelState: (channelId: Hex, state: State) => Promise<void>;
-};
-
-const createInMemoryStateStorage = (): StateStorage => {
-  const channelStates: Map<Hex, State[]> = new Map();
-  return {
-    getChannelState: async (channelId: Hex) => {
-      const states = channelStates.get(channelId);
-      // Return empty array if no states yet instead of throwing
-      return states || [];
-    },
-    appendChannelState: async (channelId: Hex, state: State) => {
-      const states = channelStates.get(channelId);
-      if (!states) {
-        channelStates.set(channelId, [state]);
-        return;
-      }
-      states.push(state);
-      channelStates.set(channelId, states);
-    }
-  };
-};
-
-// BigInt JSON serialization helpers
-const replacerBigInt = (key: string, value: any): any => {
-  return typeof value === 'bigint' ? value.toString() + 'n' : value;
-};
-
-const reviverBigInt = (key: string, value: any): any => {
-  if (typeof value === 'string' && /^\d+n$/.test(value)) {
-    return BigInt(value.slice(0, -1));
-  }
-  return value;
-};
-
-const createFileSystemStateStorage = (walletAddress: Address): StateStorage => {
-  const STATE_FILE = `state-${walletAddress}.json`;
-
-  // Initialize file if it doesn't exist
-  if (!fs.existsSync(STATE_FILE)) {
-    fs.writeFileSync(STATE_FILE, '{}', 'utf8');
-  }
-
-  return {
-    getChannelState: async (channelId: Hex) => {
-      const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'), reviverBigInt);
-      return data[channelId] || [];
-    },
-    appendChannelState: async (channelId: Hex, state: State) => {
-      const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'), reviverBigInt);
-      if (!data[channelId]) {
-        data[channelId] = [];
-      }
-      data[channelId].push(state);
-      fs.writeFileSync(STATE_FILE, JSON.stringify(data, replacerBigInt, 2));
-    }
-  };
-};
 
 
 const createMessageHandler = <T extends MessageSchema>(props: {

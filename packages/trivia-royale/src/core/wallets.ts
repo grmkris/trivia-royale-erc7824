@@ -152,8 +152,7 @@ export interface Wallets {
  *
  * Useful for backends that manage their own keys
  */
-export function createWallet(privateKey: `0x${string}`): Wallet {
-  const account = privateKeyToAccount(privateKey);
+export function createWallet(account: Account): Wallet {
   const walletClient = createWalletClient({
     account,
     chain: sepolia,

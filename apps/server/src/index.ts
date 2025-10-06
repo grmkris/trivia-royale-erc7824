@@ -6,17 +6,20 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { createBetterNitroliteClient, createWallet } from '@trivia-royale/game';
+import { createBetterNitroliteClient, createWallet, parseUSDC, formatUSDC } from '@trivia-royale/game';
 import { mnemonicToAccount } from 'viem/accounts';
+import { z } from 'zod';
 
-// Create server wallet from mnemonic (index 2)
-const mnemonic = process.env.MNEMONIC;
-if (!mnemonic) {
-  throw new Error('MNEMONIC is required in .env');
-}
+// Create server wallet from mnemonic (index 2 = server wallet, same as loadWallets().server)
+const envSchema = z.object({
+  MNEMONIC: z.string(),
+});
+const env = envSchema.parse(Bun.env);
 
-const account = mnemonicToAccount(mnemonic, { accountIndex: 2 });
-const serverWallet = createWallet(account.privateKey);
+const account = mnemonicToAccount(env.MNEMONIC, { accountIndex: 2 });
+
+// @ts-expect-error - account is a valid Account
+const serverWallet = createWallet(account);
 
 // Create server client using factory pattern
 const createServerClient = () => {
@@ -38,6 +41,29 @@ console.log(`📍 Server address: ${serverWallet.address}`);
 await serverClient.connect()
   .then(() => console.log('✅ Connected to ClearNode'))
   .catch(err => console.error('❌ Failed to connect:', err));
+
+// Check and initialize channel
+const MIN_CHANNEL_BALANCE = parseUSDC('10'); // 10 USDC minimum
+const balances = await serverClient.getBalances();
+
+console.log('💰 Server balances:');
+console.log(`  Wallet: ${formatUSDC(balances.wallet)} USDC`);
+console.log(`  Custody: ${formatUSDC(balances.custodyContract)} USDC`);
+console.log(`  Channel: ${formatUSDC(balances.channel)} USDC`);
+console.log(`  Ledger: ${formatUSDC(balances.ledger)} USDC`);
+
+if (balances.channel === 0n) {
+  console.log(`📊 No channel found, creating with ${formatUSDC(MIN_CHANNEL_BALANCE)} USDC...`);
+  await serverClient.deposit(MIN_CHANNEL_BALANCE);
+  console.log('✅ Channel created');
+} else if (balances.channel < MIN_CHANNEL_BALANCE) {
+  throw new Error(
+    `Insufficient channel balance: ${formatUSDC(balances.channel)} ` +
+    `(need ${formatUSDC(MIN_CHANNEL_BALANCE)})`
+  );
+} else {
+  console.log(`✅ Channel exists with ${formatUSDC(balances.channel)} USDC`);
+}
 
 // Create Hono app
 const app = new Hono();
