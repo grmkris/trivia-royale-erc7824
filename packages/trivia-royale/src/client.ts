@@ -160,9 +160,6 @@ const createMessageHandler = <T extends MessageSchema>(props: {
       console.log('🔍 [WS] Parsed method:', response.method);
       switch (response.method) {
         case RPCMethod.Message:
-          console.log('🔍 [WS] RPCMethod.Message detected');
-          console.log('🔍 [WS] Full response object:', JSON.stringify(response, null, 2));
-          console.log('🔍 [WS] response.params:', JSON.stringify(response.params, null, 2));
           const MessageResponseSchema = z.object({
             app_session_id: z.custom<Hex>(),
             message: z.object({
