@@ -3,12 +3,13 @@
  *
  * Provides storage and retrieval of session keypairs for ClearNode authentication.
  * Session keys persist across app restarts, maintaining access to channels and sessions.
+ *
+ * This module is browser-compatible. For Node.js filesystem persistence,
+ * import from './key-manager-fs' instead.
  */
 
 import type { Address } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import fs from 'fs';
-import { randomBytes } from 'crypto';
 
 export interface SessionKeypair {
   privateKey: `0x${string}`;
@@ -17,9 +18,13 @@ export interface SessionKeypair {
 
 /**
  * Generate ephemeral session keypair (internal use only - use KeyManager instead)
+ * Uses Web Crypto API (browser-compatible)
  */
-function generateSessionKeypair(): SessionKeypair {
-  const privateKey = `0x${randomBytes(32).toString('hex')}` as `0x${string}`;
+export function generateSessionKeypair(): SessionKeypair {
+  // Use Web Crypto API (works in browser and Node.js 15+)
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  const privateKey = `0x${Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`;
   const account = privateKeyToAccount(privateKey);
 
   return {
@@ -110,49 +115,3 @@ export function createLocalStorageKeyManager(): KeyManager {
   };
 }
 
-/**
- * FileSystem key manager (Node.js server persistence)
- */
-export function createFileSystemKeyManager(dataDir: string = '.'): KeyManager {
-  // Ensure data directory exists
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-
-  const getFilePath = (address: Address): string =>
-    `${dataDir}/session-key-${address.toLowerCase()}.json`;
-
-  return {
-    getSessionKey(walletAddress: Address): SessionKeypair | undefined {
-      const filePath = getFilePath(walletAddress);
-
-      if (!fs.existsSync(filePath)) return undefined;
-
-      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      const account = privateKeyToAccount(data.privateKey as `0x${string}`);
-      return {
-        privateKey: data.privateKey as `0x${string}`,
-        address: account.address
-      };
-    },
-
-    generateSessionKey(walletAddress: Address): SessionKeypair {
-      const keypair = generateSessionKeypair();
-      const filePath = getFilePath(walletAddress);
-
-      fs.writeFileSync(filePath, JSON.stringify({
-        privateKey: keypair.privateKey,
-        address: keypair.address,
-      }, null, 2), 'utf8');
-
-      return keypair;
-    },
-
-    clearSessionKey(walletAddress: Address): void {
-      const filePath = getFilePath(walletAddress);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    },
-  };
-}

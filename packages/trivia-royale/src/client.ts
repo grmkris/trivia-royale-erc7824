@@ -527,8 +527,18 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
       );
     }
 
-    // If funds are in channel or ledger, need to handle them
-    if (balances.channel > 0n || balances.ledger > 0n) {
+    // Strategy: Use custody first (cheapest), then resize channel for remaining amount
+    let remainingToWithdraw = amount;
+
+    // Step 1: Check how much we can use from custody (already on-chain, no resize needed)
+    const fromCustody = balances.custodyContract >= remainingToWithdraw
+      ? remainingToWithdraw
+      : balances.custodyContract;
+
+    remainingToWithdraw -= fromCustody;
+
+    // Step 2: If need more funds, pull from channel/ledger via resize
+    if (remainingToWithdraw > 0n) {
       const channelId = await getChannelWithBroker(
         ws,
         props.wallet,
@@ -536,56 +546,33 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
       );
 
       if (channelId) {
-        // Calculate total funds to drain
-        const totalToDrain = balances.channel + balances.ledger;
+        // Calculate how much to pull from ledger and channel
+        const fromLedger = balances.ledger >= remainingToWithdraw
+          ? remainingToWithdraw
+          : balances.ledger;
 
-        console.log(`  💰 Draining channel: ${formatUSDC(totalToDrain)} USDC`);
-        console.log(`     • Channel balance: ${formatUSDC(balances.channel)}`);
-        console.log(`     • Ledger balance: ${formatUSDC(balances.ledger)}`);
+        const fromChannel = remainingToWithdraw - fromLedger;
 
-        // To drain the channel completely, we need to handle two cases:
+        console.log(`  📊 Resizing channel to withdraw ${formatUSDC(remainingToWithdraw)} USDC`);
+        console.log(`     • From ledger: ${formatUSDC(fromLedger)}`);
+        console.log(`     • From channel: ${formatUSDC(fromChannel)}`);
 
-        if (balances.ledger !== 0n) {
-          // If we have a ledger balance, we need to do a resize that:
-          // 1. Allocates the ledger balance to the channel
-          // 2. Then moves everything to custody
-          // Based on e2e-flow.ts pattern: both values negative when moving ledger→channel→custody
-          const resizeAmount = -(balances.channel + balances.ledger);
-          const allocateAmount = balances.ledger;
+        // Resize: negative amount = channel → custody
+        const resizeAmount = -(fromLedger + fromChannel);
+        const allocateAmount = fromLedger; // deallocate ledger → channel
 
-          console.log(`  📊 Resize parameters:`);
-          console.log(`     • resize_amount: ${resizeAmount} (drain to custody)`);
-          console.log(`     • allocate_amount: ${allocateAmount} (ledger allocation)`);
-
-          await resizeChannelWithAmounts(channelId, resizeAmount, allocateAmount);
-        } else {
-          // If no ledger balance, just drain the channel to custody
-          console.log(`  📊 No ledger balance, draining channel only`);
-          await resizeChannelWithAmounts(channelId, -balances.channel, 0n);
-        }
-        console.log(`  ✅ Channel drained to custody`);
-
-        // Small delay to ensure state is updated
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Now close the empty channel
-        console.log(`  🔒 Closing empty channel...`);
-        const { closeChannelViaRPC } = await import('./rpc/channels');
-        await closeChannelViaRPC(ws, props.wallet, channelId);
-
-        // Wait for close to settle
-        console.log(`  ⏳ Waiting for channel close to settle...`);
-        await new Promise(r => setTimeout(r, 3000));
+        await resizeChannelWithAmounts(channelId, resizeAmount, allocateAmount);
+        console.log(`  ✅ Resized channel, moved ${formatUSDC(remainingToWithdraw)} to custody`);
       }
     }
 
-    // Now withdraw from custody to wallet
-    const finalCustodyBalance = await client.getAccountBalance(
+    // Step 3: Withdraw requested amount from custody to wallet
+    const totalInCustody = await client.getAccountBalance(
       SEPOLIA_CONFIG.contracts.tokenAddress as Address
     );
 
-    if (finalCustodyBalance > 0n) {
-      const withdrawAmount = amount > finalCustodyBalance ? finalCustodyBalance : amount;
+    if (totalInCustody > 0n) {
+      const withdrawAmount = amount > totalInCustody ? totalInCustody : amount;
       console.log(`  💰 Withdrawing ${formatUSDC(withdrawAmount)} from custody to wallet...`);
 
       const txHash = await client.withdrawal(

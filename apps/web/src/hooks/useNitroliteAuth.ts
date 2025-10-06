@@ -6,7 +6,6 @@ import { useWalletClient, usePublicClient } from "wagmi";
 import {
 	createWallet,
 	createBetterNitroliteClient,
-	createLocalStateStorage,
 	createLocalStorageKeyManager,
 	SEPOLIA_CONFIG,
 	type BetterNitroliteClient
@@ -45,9 +44,8 @@ export function useNitroliteAuth(): UseNitroliteAuthResult {
 				throw new Error("Public client not available");
 			}
 
-			// Use localStorage for persistent session keys and state
+			// Use localStorage for persistent session keys
 			const keyManager = createLocalStorageKeyManager();
-			const stateStorage = createLocalStateStorage();
 
 			// Create Wallet object with persistent session keys
 			// @ts-expect-error - wagmi account is compatible with viem Account
@@ -56,7 +54,6 @@ export function useNitroliteAuth(): UseNitroliteAuthResult {
 			// Create BetterNitroliteClient
 			const nitroliteClient = createBetterNitroliteClient({
 				wallet,
-				stateStorage,
 				sessionAllowance: SEPOLIA_CONFIG.game.entryFee, // Allow for game sessions
 			});
 

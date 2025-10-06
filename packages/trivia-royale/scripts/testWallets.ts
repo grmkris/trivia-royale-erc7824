@@ -2,7 +2,7 @@ import { mnemonicToAccount } from 'viem/accounts';
 import { createWalletClient, createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
 import { testEnv } from './testEnv';
-import { createFileSystemKeyManager } from '../src/core/key-manager';
+import { createFileSystemKeyManager } from '../src/core/key-manager-fs';
 import type { Wallet } from '../src/core/wallets';
 
 const WALLET_NAMES = [

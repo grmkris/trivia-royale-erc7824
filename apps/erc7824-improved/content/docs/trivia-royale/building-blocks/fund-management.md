@@ -82,6 +82,11 @@ graph LR
 
 Withdrawal is more complex because it must handle **ledger**, **channel**, and **custody** balances.
 
+The `withdraw()` function only withdraws the **requested amount** and **keeps the channel open**. It optimizes by:
+1. Using custody funds first (no resize needed)
+2. Then pulling from channel/ledger only if necessary
+3. Leaving remaining balance in the channel for future use
+
 ### Simple Withdrawal (No Ledger Balance)
 
 ```typescript
@@ -92,6 +97,7 @@ await client.withdraw(parseUSDC('5'));
 
 const after = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 10, ledger: 0 }
+// Note: Channel still open with 10 USDC remaining
 ```
 
 **What happened**:
@@ -118,6 +124,7 @@ await client.withdraw(parseUSDC('10'));
 
 const after = await client.getBalances();
 // { wallet: 95, custody: 0, channel: 5, ledger: 0 }
+// Note: Channel still open with 5 USDC remaining
 ```
 
 **What happened**:
@@ -133,9 +140,9 @@ graph LR
 2. **Resize**: Channel reduced by 10 (15 → 5), custody increased (0 → 10)
 3. **Withdraw**: Custody to wallet (10 USDC)
 
-### Total Withdrawal (Draining Everything)
+### Withdrawing All Funds
 
-When withdrawing all funds, the channel is closed:
+You can withdraw all available funds while keeping the channel open:
 
 ```typescript
 const before = await client.getBalances();
@@ -148,22 +155,22 @@ await client.withdraw(total);
 
 const after = await client.getBalances();
 // { wallet: 100, custody: 0, channel: 0, ledger: 0 }
+// Note: Channel still open, ready for future deposits
 ```
 
 **What happened**:
 
 ```mermaid
 graph LR
-    A[Ledger: 5] -->|1. allocate| B[Channel: 15]
+    A[Ledger: 5] -->|1. deallocate| B[Channel: 15]
     B -->|2. resize -15| C[Custody: 15]
-    C -->|3. close channel| D[Channel: 0]
-    D -->|4. withdraw| E[Wallet: 100]
+    C -->|3. withdraw| D[Wallet: 100]
 ```
 
-1. **Allocate**: Ledger → channel
-2. **Resize**: Channel fully drained → custody
-3. **Close**: Empty channel closed (on-chain transaction)
-4. **Withdraw**: Custody → wallet
+1. **Deallocate**: Ledger balance moved to channel (5 → channel)
+2. **Resize**: Channel drained to custody (15 → custody)
+3. **Withdraw**: Custody transferred to wallet (15 USDC)
+4. **Channel remains open** with 0 balance, ready for future deposits
 
 ## Resize Operations
 
@@ -293,7 +300,8 @@ Each resize fetches the fresh state from the contract. No history tracking requi
 The session key is separate from your wallet's private key and must be **persisted across application restarts** to continue using existing channels.
 
 ```typescript
-import { createFileSystemKeyManager } from './core/key-manager';
+// Node.js only - for browser, use createLocalStorageKeyManager
+import { createFileSystemKeyManager } from './core/key-manager-fs';
 
 // Create key manager (persists to disk)
 const keyManager = createFileSystemKeyManager('./keys');

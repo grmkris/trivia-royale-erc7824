@@ -3,7 +3,6 @@
 import {
   createBetterNitroliteClient,
   createWallet,
-  createLocalStateStorage,
   createLocalStorageKeyManager,
   type BetterNitroliteClient
 } from '@trivia-royale/game';
@@ -78,18 +77,16 @@ export function NitroliteProvider({ children }: { children: ReactNode }) {
 
     setStatus('connecting');
 
-    // Use localStorage for persistent session keys and state
+    // Use localStorage for persistent session keys
     const keyManager = createLocalStorageKeyManager();
-    const stateStorage = createLocalStateStorage();
 
     // Create wallet with persistent session keys
     // @ts-expect-error - wagmi account is compatible with viem Account
     const wallet = createWallet(walletClient.account, keyManager);
 
-    // Create client with localStorage
+    // Create client
     const nitroClient = createBetterNitroliteClient({
       wallet,
-      stateStorage,
       sessionAllowance: '0.1', // allow 0.1 USDC for app sessions
       onAppMessage: (type, sessionId, data) => {
         console.log('📬 App message:', type, data);

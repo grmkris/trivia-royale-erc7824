@@ -91,10 +91,11 @@ Control who can make decisions in a session:
 Move funds from **wallet → custody → channel**. Creates channel if it doesn't exist, or resizes existing channel.
 
 ### Withdraw
-Move funds from **ledger → channel → custody → wallet**. May involve multiple steps:
-1. Deallocate ledger → channel
-2. Resize channel → custody
-3. Withdraw custody → wallet
+Move the requested amount from ledger/channel/custody → wallet. Keeps channel open. Steps:
+1. Use custody funds first (if available)
+2. If needed, deallocate ledger → channel
+3. If needed, resize channel → custody
+4. Withdraw requested amount from custody → wallet
 
 ### Resize
 On-chain operation to adjust channel capacity:
