@@ -346,13 +346,13 @@ function parseUSDC(amount: string): bigint {
 }
 ```
 
-> 📁 **Full Implementation**: This documentation is built from the complete working code in the Trivia Royale repository.
+> 📁 **Full Implementation**: View the complete working code:
 >
 > Key files:
-> - `packages/trivia-royale/src/client.ts` - TriviaClient implementation
-> - `packages/trivia-royale/src/client.test.ts` - Full game test with balance verification
-> - `packages/trivia-royale/src/game.test.ts` - Additional game patterns
-> - `packages/trivia-royale/src/core/erc20.ts` - parseUSDC and formatUSDC helpers
+> - [`packages/trivia-royale/src/client.ts`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/client.ts) - TriviaClient implementation (914 lines)
+> - [`packages/trivia-royale/src/client.test.ts`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/client.test.ts) - Full game test with balance verification
+> - [`packages/trivia-royale/src/game.test.ts`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/game.test.ts) - Additional game patterns (493 lines)
+> - [`packages/trivia-royale/src/core/erc20.ts`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/core/erc20.ts) - parseUSDC and formatUSDC helpers
 
 ## Key Patterns Demonstrated
 

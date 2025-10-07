@@ -2,6 +2,10 @@
   "name": "docs",
   "version": "0.0.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/grmkris/trivia-royale-erc7824"
+  },
   "scripts": {
     "build": "next build",
     "dev": "next dev --turbo",

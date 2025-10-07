@@ -506,6 +506,13 @@ async function createSessionWithRetry(request, maxRetries = 3) {
 }
 ```
 
+## Implementation
+
+See the distributed session pattern in action:
+- [`prepareSession()`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/client.ts#L700-L760) - Prepares unsigned session request
+- [`signSessionRequest()`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/client.ts#L762-L780) - Signs session request with participant key
+- [`createSession()`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/client.ts#L782-L820) - Submits signatures to ClearNode
+
 ## Next Steps
 
 - **[Session Lifecycle](./session-lifecycle)**: Manage active sessions and cleanup

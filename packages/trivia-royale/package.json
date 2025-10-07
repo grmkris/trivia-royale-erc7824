@@ -3,9 +3,14 @@
   "version": "0.1.0",
   "module": "src/index.ts",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/grmkris/trivia-royale-erc7824"
+  },
   "exports": {
     ".": "./src/index.ts",
-    "./fs-key-manager": "./src/core/key-manager-fs.ts"
+    "./fs-key-manager": "./src/core/key-manager-fs.ts",
+    "./rpc": "./src/rpc/connection.ts"
   },
   "scripts": {
     "test": "bun run src/game.test.ts",

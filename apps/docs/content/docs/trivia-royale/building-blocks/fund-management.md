@@ -185,7 +185,7 @@ When you call `deposit()` for the first time, the `BetterNitroliteClient` create
 
 ### The Flow
 
-**Implementation**: `rpc/channels.ts:66-193` (`createChannelViaRPC`)
+**Implementation**: [`createChannelViaRPC`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/rpc/channels.ts#L66-L193) in `rpc/channels.ts`
 
 ```mermaid
 sequenceDiagram

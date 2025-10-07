@@ -23,10 +23,17 @@ Before performing any channel operations, you must connect and authenticate with
 
 ### Establishing the Connection
 
-```typescript
-import { connectToClearNode, authenticateClearNode } from './rpc/connection';
-import { createWallet } from './core/wallets';
+```typescript twoslash
+import { connectToClearNode } from '@trivia-royale/game/rpc';
+import { createWallet } from '@trivia-royale/game';
+import type { KeyManager } from '@trivia-royale/game';
+import type { WalletClient, PublicClient } from 'viem';
 
+declare const walletClient: WalletClient;
+declare const publicClient: PublicClient;
+declare const keyManager: KeyManager;
+declare const CLEARNODE_URL: string;
+// ---cut---
 // Create wallet with session key manager
 const wallet = createWallet({
   walletClient,
@@ -36,6 +43,7 @@ const wallet = createWallet({
 
 // Connect to ClearNode
 const ws = await connectToClearNode(CLEARNODE_URL);
+//    ^?
 ```
 
 ### Authentication with Session Key
@@ -136,8 +144,10 @@ return new Promise((resolve, reject) => {
 
 ### Real Example: Channel Creation
 
+View the complete implementation: [`createChannelViaRPC`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/rpc/channels.ts#L66-L193) in `rpc/channels.ts`
+
 ```typescript
-// rpc/channels.ts:66-193
+// packages/trivia-royale/src/rpc/channels.ts:66-193
 export async function createChannelViaRPC(
   ws: WebSocket,
   wallet: Wallet,
@@ -215,9 +225,9 @@ Session keys are cryptographic keys used to sign channel state transitions. They
 The session key must be **persisted across application restarts** to continue using existing channels:
 
 ```typescript
-// Node.js only - for browser, use createLocalStorageKeyManager
-import { createFileSystemKeyManager } from './core/key-manager-fs';
-import { createWallet } from './core/wallets';
+// Node.js - use file system key manager
+import { createFileSystemKeyManager } from '@trivia-royale/game/fs-key-manager';
+import { createWallet } from '@trivia-royale/game';
 import { createWalletClient, createPublicClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
@@ -251,16 +261,19 @@ const wallet = createWallet({
 
 **FileSystem** (Node.js/Backend):
 ```typescript
-const keyManager = createFileSystemKeyManager('./data');
+import { createFileSystemKeyManager } from '@trivia-royale/game/fs-key-manager';
+const keyManager = createFileSystemKeyManager('./data/keys');
 ```
 
 **LocalStorage** (Browser):
 ```typescript
+import { createLocalStorageKeyManager } from '@trivia-royale/game';
 const keyManager = createLocalStorageKeyManager();
 ```
 
-**In-Memory** (Testing only):
+**In-Memory** (Testing only - keys are lost on restart):
 ```typescript
+import { createInMemoryKeyManager } from '@trivia-royale/game';
 const keyManager = createInMemoryKeyManager();
 ```
 
@@ -278,21 +291,33 @@ Always persist session keys in production applications.
 
 The session key you use to create a channel **must be used for all operations** on that channel:
 
-```typescript
+```typescript twoslash
+import { createWallet, createInMemoryKeyManager, createBetterNitroliteClient, parseUSDC } from '@trivia-royale/game';
+import type { WalletClient, PublicClient } from 'viem';
+
+declare const walletClient: WalletClient;
+declare const publicClient: PublicClient;
+// ---cut---
 // Create with session key A
 const wallet = createWallet({
-  sessionKeyManager: createFileSystemKeyManager('./keys/alice')
+  walletClient,
+  publicClient,
+  sessionKeyManager: createInMemoryKeyManager()
 });
+const client = createBetterNitroliteClient({ wallet, clearNodeUrl: 'ws://localhost:8080' });
 await client.deposit(parseUSDC('10'));  // Creates channel with key A
+//                    ^?
 
 // ✓ Resize with same session key A
 await client.deposit(parseUSDC('5'));   // Works!
 
 // ✗ Try to resize with different session key B
 const wallet2 = createWallet({
-  sessionKeyManager: createFileSystemKeyManager('./keys/bob')
+  walletClient,
+  publicClient,
+  sessionKeyManager: createInMemoryKeyManager()  // Different key
 });
-const client2 = createBetterNitroliteClient({ wallet: wallet2 });
+const client2 = createBetterNitroliteClient({ wallet: wallet2, clearNodeUrl: 'ws://localhost:8080' });
 await client2.deposit(parseUSDC('5'));  // Error: Signature mismatch
 ```
 
@@ -304,42 +329,22 @@ Every channel operation involves **state transitions** - moving from one valid s
 
 ### Channel State Anatomy
 
-A complete channel state contains these fields:
+A complete channel state contains these fields (from the `State` type in `@erc7824/nitrolite`):
 
-```typescript
-interface ChannelState {
-  // Identity
-  channelId: Hex;              // Unique identifier (derived from participants + nonce)
-  intent: Hex;                 // Adjudicator contract address
+```typescript twoslash
+import type { State } from '@erc7824/nitrolite';
 
-  // Versioning
-  version: bigint;             // Monotonically increasing (0, 1, 2, ...)
-  isFinal: boolean;            // True only when channel is closed
-
-  // State Data
-  data: Hex;                   // Encoded application-specific data
-
-  // Fund Allocations
-  allocations: [
-    {
-      destination: Address;    // Participant 1 address
-      amount: bigint;          // Their balance in wei
-      allocationType: number;  // 0 = simple allocation
-      metadata: Hex;           // Additional data
-    },
-    {
-      destination: Address;    // Participant 2 address (broker)
-      amount: bigint;
-      allocationType: number;
-      metadata: Hex;
-    }
-  ];
-
-  // Signatures
-  serverSignature: Hex;        // Broker's signature on this state
-  // clientSignature added automatically by SDK
-}
+declare const channelState: State;
+//            ^?
 ```
+
+**Key fields**:
+- **Identity**: `channelId` (unique identifier) and `intent` (adjudicator contract)
+- **Versioning**: `version` (monotonically increasing) and `isFinal` (true when closed)
+- **State Data**: `data` (encoded application-specific data)
+- **Fund Allocations**: Array of allocations with `destination`, `amount`, `allocationType`, and `metadata`
+
+**Note**: The `serverSignature` is passed separately in resize operations, not as part of the `State` type itself.
 
 ### State Transitions
 
@@ -415,12 +420,22 @@ const clientState = convertRPCToClientState(rpcState, serverSignature);
 
 Proof states validate that a state transition is legitimate. Only the **last on-chain state** is required:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import type { State } from '@erc7824/nitrolite';
+import type { Hex } from 'viem';
+
+declare const client: BetterNitroliteClient;
+declare const channelId: Hex;
+declare const newState: State & { serverSignature: Hex };
+// ---cut---
 // Get current on-chain state
 const channelData = await client.getChannelData(channelId);
+//    ^?
 
 // Use it as proof
 const proofStates = [channelData.lastValidState];
+//    ^?
 
 // Submit new state
 await client.resizeChannel({
@@ -436,13 +451,19 @@ await client.resizeChannel({
 4. No need to prove full history - just that you're moving forward
 
 **Example**:
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import type { Hex } from 'viem';
+
+declare const client: BetterNitroliteClient;
+declare const channelId: Hex;
+// ---cut---
 // On-chain state: version 5
 const channelData = await client.getChannelData(channelId);
 // channelData.lastValidState.version === 5n
+//             ^?
 
-// ClearNode gives you version 6
-const { state } = await resizeChannel(...);
+// ClearNode gives you version 6 via RPC (handled internally)
 // state.version === 6
 
 // Contract accepts: 6 > 5 ✓
@@ -494,15 +515,24 @@ Every channel operation increments the version:
 
 If you try to submit an old version, the contract rejects it:
 
-```typescript
+```typescript twoslash
+// @errors: 2345
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+// ---cut---
 // Current on-chain version: 2
 
-// ✗ Try to submit version 1 (old state)
-await client.resizeChannel({ version: 1n, ... });
+// ✗ Try to submit version 1 (old state) - will fail on-chain
+// await client.resizeChannel({ version: 1n, ... });
 // Error: Version must be greater than current version
 
 // ✓ Submit version 3 (new state)
-await client.resizeChannel({ version: 3n, ... });
+const result = await client.resizeChannel({
+//    ^?
+  resizeState: {} as any,
+  proofStates: []
+});
 // Success!
 ```
 

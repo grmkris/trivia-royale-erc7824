@@ -6,7 +6,7 @@ Three players answer questions, fastest correct answers win. Prize pool splits 5
 
 **Use this as a guide** to understand Yellow protocol's core features - balance management, sessions, and message passing.
 
-[Documentation](http://localhost:3000/docs) | [Docker Hub](https://hub.docker.com/r/kristjangrm/trivia-royale-server)
+[Documentation](https://trivia-royale-erc7824-docs.vercel.app/docs) | [GitHub](https://github.com/grmkris/trivia-royale-erc7824) | [Docker Hub](https://hub.docker.com/r/kristjangrm/trivia-royale-server)
 
 ---
 
@@ -23,7 +23,7 @@ bun run dev:server
 bun run dev:web
 ```
 
-Open http://localhost:3000
+Open http://localhost:3000 (or visit [deployed docs](https://trivia-royale-erc7824-docs.vercel.app))
 
 ---
 
@@ -62,7 +62,7 @@ Run the docs site locally:
 bun run dev:docs
 ```
 
-Visit http://localhost:3000/docs to learn:
+Visit https://trivia-royale-erc7824-docs.vercel.app/docs (or http://localhost:3000/docs locally) to learn:
 - How the 4-layer balance system works
 - Coordinating multi-party sessions
 - Message passing patterns
@@ -85,7 +85,7 @@ See `apps/server/README.md` for configuration.
 
 ## Setup
 
-Full setup instructions in the [documentation](http://localhost:3000/docs), but quick version:
+Full setup instructions in the [documentation](https://trivia-royale-erc7824-docs.vercel.app/docs), but quick version:
 
 1. Install Bun: `curl -fsSL https://bun.sh/install | bash`
 2. Copy `.env.example` to `.env` and configure:

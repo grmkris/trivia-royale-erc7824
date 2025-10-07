@@ -88,6 +88,8 @@ async function simplePaymentExample() {
 simplePaymentExample();
 ```
 
+> 💡 **Explore the code**: This pattern is used throughout the [test suite](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/client.test.ts) and documented in [`client.ts`](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/client.ts)
+
 ## What's Happening
 
 ### Step 1: Connect

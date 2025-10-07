@@ -1,6 +1,10 @@
 {
   "name": "trivia-royale",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/grmkris/trivia-royale-erc7824"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"

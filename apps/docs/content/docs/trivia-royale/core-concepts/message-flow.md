@@ -139,7 +139,7 @@ This broadcasts to:
 
 ## Real Example: Trivia Game Round
 
-Here's how a complete round flows in the trivia game (from `packages/trivia-royale/src/game.test.ts:290-343`):
+Here's how a complete round flows in the trivia game ([view source](https://github.com/grmkris/trivia-royale-erc7824/blob/main/packages/trivia-royale/src/game.test.ts#L290-L343)):
 
 ```typescript
 // Server broadcasts question
