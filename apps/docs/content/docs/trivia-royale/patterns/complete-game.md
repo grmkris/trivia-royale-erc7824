@@ -346,13 +346,13 @@ function parseUSDC(amount: string): bigint {
 }
 ```
 
-> 📁 **Full Implementation**: See the complete working code in the [Trivia Royale repository](TODO@kris: Add GitHub repository URL)
+> 📁 **Full Implementation**: This documentation is built from the complete working code in the Trivia Royale repository.
 >
 > Key files:
-> - `client.ts` - BetterNitroliteClient implementation
-> - `client.test.ts` - Full game test with balance verification
-> - `game.test.ts` - Additional game patterns
-> - `core/erc20.ts` - parseUSDC and formatUSDC helpers
+> - `packages/trivia-royale/src/client.ts` - TriviaClient implementation
+> - `packages/trivia-royale/src/client.test.ts` - Full game test with balance verification
+> - `packages/trivia-royale/src/game.test.ts` - Additional game patterns
+> - `packages/trivia-royale/src/core/erc20.ts` - parseUSDC and formatUSDC helpers
 
 ## Key Patterns Demonstrated
 
@@ -403,60 +403,6 @@ await server.closeSession(sessionId, [
 ]);
 
 // Funds automatically return to ledger balances
-```
-
-## Critical Insights
-
-### Fund Conservation Principle
-
-**The golden rule**: The sum of all balance changes **must equal zero**. Value cannot be created or destroyed, only transferred.
-
-```typescript
-// Initial state - everyone starts at 0
-const totalBefore = 0 + 0 + 0 = 0 USDC
-
-// Entry fees deducted when session created
-// player1: 0 - 0.01 = -0.01
-// player2: 0 - 0.01 = -0.01
-// player3: 0 - 0.01 = -0.01
-// Total: -0.03 USDC
-
-// Prizes distributed when session closed
-// winner:  -0.01 + 0.015 = +0.005 (net +0.5¢)
-// second:  -0.01 + 0.009 = -0.001 (net -0.1¢)
-// third:   -0.01 + 0.006 = -0.004 (net -0.4¢)
-// Total change: +0.005 - 0.001 - 0.004 = 0 ✓
-
-// The total change MUST be zero
-totalChange === 0n; // Fund conservation verified!
-```
-
-**Why this matters**:
-- Ensures fair prize distribution (no funds lost or created)
-- Detects bugs in allocation logic
-- Validates session closed correctly
-
-**What enforces it**: TODO@kris - Verify if ClearNode validates this or if it's a developer responsibility
-
-Entry fees (3 × 0.01 = 0.03 USDC) were collected and redistributed as prizes (0.015 + 0.009 + 0.006 = 0.03 USDC). Total value in the system remains constant.
-
-### Message Ordering
-Answers may arrive out of order. Always include timestamps:
-```typescript
-const correctAnswers = submissions
-  .filter(a => a.answer === correctAnswer)
-  .sort((a, b) => a.timestamp - b.timestamp);
-
-const winner = correctAnswers[0]; // Earliest timestamp wins
-```
-
-### Session Allowances
-Players specify maximum stake when connecting:
-```typescript
-const client = createBetterNitroliteClient({
-  wallet,
-  sessionAllowance: '0.01',  // Won't join sessions > 0.01 USDC
-});
 ```
 
 ## Next Steps

@@ -148,20 +148,6 @@ Each session has its own allocations deducted from your ledger balance.
 - Funds are distributed according to last agreed state
 - Reconnect and check `getActiveSessions()` to see if still active
 
-### Why do signature order matter in `createSession`?
-
-The signatures must be provided in a specific order for ClearNode verification:
-
-```typescript
-const signatures = [
-  serverSignature,   // 1. Weight holder first (if server-controlled)
-  player1Signature,  // 2. Then non-zero allocation participants
-  player2Signature,  //    in the order they appear in allocations
-];
-```
-
-TODO@kris: Verify technical reason for signature ordering (ClearNode validation algorithm)
-
 ## Messages
 
 ### Do I receive my own messages?
@@ -245,8 +231,6 @@ await sendMessage(sessionId, 'move', { playerId, position });
 ### What enforces fund conservation?
 
 The principle that `sum(all balance changes) === 0`:
-
-TODO@kris: Verify if ClearNode validates fund conservation or if it's developer responsibility
 
 **Current understanding**: Developers should verify fund conservation in their tests. ClearNode may validate allocations sum correctly, but explicit checks recommended.
 

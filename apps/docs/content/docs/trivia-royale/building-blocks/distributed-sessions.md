@@ -508,6 +508,5 @@ async function createSessionWithRetry(request, maxRetries = 3) {
 
 ## Next Steps
 
-- **[Typed Messaging](./typed-messaging)**: Define message schemas for session communication
 - **[Session Lifecycle](./session-lifecycle)**: Manage active sessions and cleanup
 - **[Complete Game](../patterns/complete-game)**: See distributed sessions in a real multiplayer game

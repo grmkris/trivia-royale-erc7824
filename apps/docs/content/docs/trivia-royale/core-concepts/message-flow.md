@@ -256,6 +256,5 @@ await player2.sendMessage(sessionId, 'answer', { ... });
 ## Next Steps
 
 Now that you understand message flow:
-- **[Typed Messaging](../building-blocks/typed-messaging)**: Deep dive into schema design patterns
 - **[Ping-Pong Example](../patterns/ping-pong)**: Build a minimal message-driven app
 - **[Complete Game](../patterns/complete-game)**: See the full trivia game implementation

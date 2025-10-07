@@ -1,6 +1,5 @@
 {
   "name": "trivia-royale",
-  "private": true,
   "type": "module",
   "workspaces": [
     "apps/*",

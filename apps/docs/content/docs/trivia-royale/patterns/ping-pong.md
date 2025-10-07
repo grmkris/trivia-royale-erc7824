@@ -170,4 +170,3 @@ Create → Active → Exchange Messages → Close
 
 - **[Distributed Sessions](../building-blocks/distributed-sessions)**: Multi-party coordination
 - **[Complete Game](./complete-game)**: Full multiplayer application
-- **[Typed Messaging](../building-blocks/typed-messaging)**: Advanced message patterns

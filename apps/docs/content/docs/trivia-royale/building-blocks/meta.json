@@ -1,10 +1,9 @@
 {
   "title": "Building Blocks",
   "pages": [
-    "index",
+    "clearnode-communication",
     "fund-management",
     "distributed-sessions",
-    "typed-messaging",
     "session-lifecycle"
   ]
 }

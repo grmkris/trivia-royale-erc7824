@@ -62,6 +62,11 @@ Practical patterns you'll use in every application:
 
 <Cards>
   <Card
+    title="ClearNode Communication"
+    description="WebSocket RPC patterns, state management, and session keys"
+    href="/docs/trivia-royale/building-blocks/clearnode-communication"
+  />
+  <Card
     title="Fund Management"
     description="Complete deposit, withdraw, and resize flows with diagrams"
     href="/docs/trivia-royale/building-blocks/fund-management"
@@ -72,16 +77,37 @@ Practical patterns you'll use in every application:
     href="/docs/trivia-royale/building-blocks/distributed-sessions"
   />
   <Card
-    title="Typed Messaging"
-    description="Type-safe message schemas and event handlers"
-    href="/docs/trivia-royale/building-blocks/typed-messaging"
-  />
-  <Card
     title="Session Lifecycle"
     description="Managing active sessions, auto-joining, and cleanup"
     href="/docs/trivia-royale/building-blocks/session-lifecycle"
   />
 </Cards>
+
+### When to Use Each
+
+**ClearNode Communication** - Understanding the low-level infrastructure:
+- Debugging WebSocket connection issues
+- Building custom RPC operations
+- Understanding state transitions
+- Managing session keys across restarts
+
+**Fund Management** - Moving value in or out of the system:
+- Initial user onboarding (deposit funds)
+- Cashing out winnings (withdraw funds)
+- Rebalancing channel capacity
+- Peer-to-peer payments
+
+**Distributed Sessions** - Creating multi-party applications:
+- Multiplayer games requiring coordination
+- Multi-party contracts and agreements
+- Collaborative applications
+- Tournament brackets
+
+**Session Lifecycle** - Managing application state:
+- Tracking active games and sessions
+- Cleaning up after completion
+- Handling disconnections gracefully
+- Managing UI state
 
 ## Patterns & Examples
 
