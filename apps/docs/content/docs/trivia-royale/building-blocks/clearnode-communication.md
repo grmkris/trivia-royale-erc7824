@@ -24,6 +24,7 @@ Before performing any channel operations, you must connect and authenticate with
 ### Establishing the Connection
 
 ```typescript twoslash
+// @errors: 2322 2719
 import { connectToClearNode } from '@trivia-royale/game/rpc';
 import { createWallet } from '@trivia-royale/game';
 import type { KeyManager } from '@trivia-royale/game';
@@ -292,6 +293,7 @@ Always persist session keys in production applications.
 The session key you use to create a channel **must be used for all operations** on that channel:
 
 ```typescript twoslash
+// @errors: 2322 2719
 import { createWallet, createInMemoryKeyManager, createBetterNitroliteClient, parseUSDC } from '@trivia-royale/game';
 import type { WalletClient, PublicClient } from 'viem';
 
@@ -304,7 +306,7 @@ const wallet = createWallet({
   publicClient,
   sessionKeyManager: createInMemoryKeyManager()
 });
-const client = createBetterNitroliteClient({ wallet, clearNodeUrl: 'ws://localhost:8080' });
+const client = createBetterNitroliteClient({ wallet });
 await client.deposit(parseUSDC('10'));  // Creates channel with key A
 //                    ^?
 
@@ -317,7 +319,7 @@ const wallet2 = createWallet({
   publicClient,
   sessionKeyManager: createInMemoryKeyManager()  // Different key
 });
-const client2 = createBetterNitroliteClient({ wallet: wallet2, clearNodeUrl: 'ws://localhost:8080' });
+const client2 = createBetterNitroliteClient({ wallet: wallet2 });
 await client2.deposit(parseUSDC('5'));  // Error: Signature mismatch
 ```
 
@@ -421,11 +423,11 @@ const clientState = convertRPCToClientState(rpcState, serverSignature);
 Proof states validate that a state transition is legitimate. Only the **last on-chain state** is required:
 
 ```typescript twoslash
-import type { BetterNitroliteClient } from '@trivia-royale/game';
+import type { NitroliteClient } from '@erc7824/nitrolite';
 import type { State } from '@erc7824/nitrolite';
 import type { Hex } from 'viem';
 
-declare const client: BetterNitroliteClient;
+declare const client: NitroliteClient;
 declare const channelId: Hex;
 declare const newState: State & { serverSignature: Hex };
 // ---cut---
@@ -452,10 +454,10 @@ await client.resizeChannel({
 
 **Example**:
 ```typescript twoslash
-import type { BetterNitroliteClient } from '@trivia-royale/game';
+import type { NitroliteClient } from '@erc7824/nitrolite';
 import type { Hex } from 'viem';
 
-declare const client: BetterNitroliteClient;
+declare const client: NitroliteClient;
 declare const channelId: Hex;
 // ---cut---
 // On-chain state: version 5
@@ -516,10 +518,10 @@ Every channel operation increments the version:
 If you try to submit an old version, the contract rejects it:
 
 ```typescript twoslash
-// @errors: 2345
-import type { BetterNitroliteClient } from '@trivia-royale/game';
+// @errors: 2345 2741
+import type { NitroliteClient } from '@erc7824/nitrolite';
 
-declare const client: BetterNitroliteClient;
+declare const client: NitroliteClient;
 // ---cut---
 // Current on-chain version: 2
 
@@ -530,8 +532,8 @@ declare const client: BetterNitroliteClient;
 // ✓ Submit version 3 (new state)
 const result = await client.resizeChannel({
 //    ^?
-  resizeState: {} as any,
-  proofStates: []
+  resizeState: {},
+  proofStates: [],
 });
 // Success!
 ```

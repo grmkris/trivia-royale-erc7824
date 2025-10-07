@@ -6,6 +6,9 @@ Three players answer questions, fastest correct answers win. Prize pool splits 5
 
 **Use this as a guide** to understand Yellow protocol's core features - balance management, sessions, and message passing.
 
+📄 **[SUMMARY.md](./SUMMARY.md)** - What Yellow SDK does and why Trivia Royale is the perfect demo
+🚀 **[GETTING_STARTED.md](./GETTING_STARTED.md)** - Step-by-step setup guide (5 minutes to running)
+
 [Documentation](https://trivia-royale-erc7824-docs.vercel.app/docs) | [GitHub](https://github.com/grmkris/trivia-royale-erc7824) | [Docker Hub](https://hub.docker.com/r/kristjangrm/trivia-royale-server)
 
 ---

@@ -15,7 +15,7 @@
   "dependencies": {
     "@trivia-royale/game": "workspace:*",
     "hono": "^4.8.0",
-    "viem": "^2.37.12",
+    "viem": "^2.37.13",
     "zod": "^4.1.11"
   },
   "devDependencies": {
