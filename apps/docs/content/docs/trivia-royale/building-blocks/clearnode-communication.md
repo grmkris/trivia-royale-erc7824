@@ -423,21 +423,19 @@ const clientState = convertRPCToClientState(rpcState, serverSignature);
 Proof states validate that a state transition is legitimate. Only the **last on-chain state** is required:
 
 ```typescript twoslash
-import type { NitroliteClient } from '@erc7824/nitrolite';
-import type { State } from '@erc7824/nitrolite';
+import type { State, FinalState } from '@erc7824/nitrolite';
+import { NitroliteClient } from '@erc7824/nitrolite';
 import type { Hex } from 'viem';
 
 declare const client: NitroliteClient;
 declare const channelId: Hex;
-declare const newState: State & { serverSignature: Hex };
+declare const newState: FinalState;
 // ---cut---
 // Get current on-chain state
 const channelData = await client.getChannelData(channelId);
-//    ^?
 
 // Use it as proof
 const proofStates = [channelData.lastValidState];
-//    ^?
 
 // Submit new state
 await client.resizeChannel({
@@ -463,7 +461,6 @@ declare const channelId: Hex;
 // On-chain state: version 5
 const channelData = await client.getChannelData(channelId);
 // channelData.lastValidState.version === 5n
-//             ^?
 
 // ClearNode gives you version 6 via RPC (handled internally)
 // state.version === 6
@@ -518,7 +515,7 @@ Every channel operation increments the version:
 If you try to submit an old version, the contract rejects it:
 
 ```typescript twoslash
-// @errors: 2345 2741
+// @errors: 2740
 import type { NitroliteClient } from '@erc7824/nitrolite';
 
 declare const client: NitroliteClient;
