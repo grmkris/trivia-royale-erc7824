@@ -18,12 +18,14 @@ export interface MessageSchema {
   };
 }
 
-// Type helper for message handler
-export type MessageHandler<T extends MessageSchema> = <K extends keyof T>(
-  type: K,
-  sessionId: Hex,
-  data: T[K]['data']
-) => void | Promise<void>;
+// Type helper for message handler - uses discriminated union for automatic type narrowing
+export type MessageHandler<T extends MessageSchema> = {
+  [K in keyof T]: (
+    type: K,
+    sessionId: Hex,
+    data: T[K]['data']
+  ) => void | Promise<void>
+}[keyof T];
 
 // Session invite type
 export interface SessionInvite {

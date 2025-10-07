@@ -1,428 +1,261 @@
 ---
 title: Message Flow
-description: Understanding how clients communicate through the ClearNode
+description: How clients exchange messages in real-time through the ClearNode broker
 ---
 
 # Message Flow
 
-In Yellow SDK applications, all real-time communication happens through the **ClearNode** - a message broker that routes messages between participants. Understanding this architecture is key to building responsive applications.
+All real-time communication in Trivia Royale happens through **typed messages** broadcast via the ClearNode broker. This guide shows you how to define, send, and handle messages using the actual trivia game as an example.
 
-## Architecture Overview
-
-```
-┌─────────────┐         ┌─────────────┐         ┌─────────────┐
-│  Client A   │←───────→│  ClearNode  │←───────→│  Client B   │
-│  (Player)   │  WebSocket   (Broker)    WebSocket  (Player)   │
-└─────────────┘         └─────────────┘         └─────────────┘
-                              ↕
-                        ┌─────────────┐
-                        │  Client C   │
-                        │  (Server)   │
-                        └─────────────┘
-```
-
-**Key points**:
-- Clients never communicate directly with each other
-- All messages flow through the ClearNode
-- ClearNode broadcasts messages to all session participants
-- Messages are **asynchronous** and **event-driven**
-
-## Message Types
-
-There are two categories of messages:
-
-### 1. System Messages (ClearNode ↔ Client)
-Protocol-level messages for connection management:
-- `auth_request`, `auth_challenge`, `auth_verify` - Authentication flow
-- `get_channels`, `get_balances` - Querying state
-- `resize_channel`, `close_channel` - Channel operations
-
-### 2. Application Messages (Client ↔ Client via ClearNode)
-Your custom message types defined in the message schema:
-- `question`, `answer`, `result` - Trivia game messages
-- `move`, `game_over` - Chess game messages
-- `offer`, `accept`, `reject` - Marketplace messages
-- Any types you define!
-
-## Application Message Flow
-
-Let's trace a message through the system:
-
-```mermaid
-sequenceDiagram
-    participant Server
-    participant ClearNode
-    participant Player1
-    participant Player2
-
-    Server->>ClearNode: sendMessage('question', data)
-    ClearNode->>Player1: broadcast 'question'
-    ClearNode->>Player2: broadcast 'question'
-    ClearNode->>Server: broadcast 'question' (to self)
-
-    Player1->>ClearNode: sendMessage('answer', data)
-    ClearNode->>Server: broadcast 'answer'
-    ClearNode->>Player1: broadcast 'answer' (to self)
-    ClearNode->>Player2: broadcast 'answer'
-```
-
-**Important observations**:
-1. Messages are broadcast to **all participants** (including sender)
-2. Messages arrive **asynchronously**
-3. Order is preserved per-sender, but not globally
-4. You must filter your own messages in handlers
-
-## Message Structure
-
-Messages are JSON objects sent via the `onAppMessage` handler. You can optionally use TypeScript interfaces:
+## The Pattern
 
 ```typescript
-interface GameSchema extends MessageSchema {
-  question: {
-    data: { text: string; round: number };
-  };
-  answer: {
-    data: { answer: string; from: Address; timestamp: number };
-  };
+// 1. Define your message types
+interface TriviaGameSchema extends MessageSchema {
+  question: { data: { text: string; round: number } };
+  answer: { data: { answer: string; from: Address; timestamp: number } };
 }
-```
 
-## Handling Messages
+// 2. Handle incoming messages
+onAppMessage: async (type, sessionId, data) => {
+  if (type === 'question') {
+    // Respond to question
+    await client.sendMessage(sessionId, 'answer', { ... });
+  }
+}
 
-Use the `onAppMessage` handler to receive messages:
-
-```typescript
-const client = createBetterNitroliteClient<TriviaGameSchema>({
-  wallet,
-  onAppMessage: async (type, sessionId, data) => {
-    // type is: 'game_start' | 'question' | 'answer' | 'round_result' | 'game_over'
-    // data is typed based on the message type!
-
-    switch (type) {
-      case 'question':
-        // data.text is typed as string
-        // data.round is typed as number
-        console.log(`Question ${data.round}: ${data.text}`);
-
-        // Respond with answer
-        await client.sendMessage(sessionId, 'answer', {
-          answer: getAnswer(data.text),
-          round: data.round,
-          from: wallet.address,
-          timestamp: Date.now(),
-        });
-        break;
-
-      case 'round_result':
-        if (data.winner === wallet.address) {
-          console.log(`I won round ${data.round}!`);
-        }
-        break;
-
-      // ... handle other message types
-    }
-  },
-});
-```
-
-## Sending Messages
-
-Use `sendMessage()` to broadcast to all session participants:
-
-```typescript
+// 3. Send messages
 await client.sendMessage(sessionId, 'question', {
   text: 'What is 2+2?',
   round: 1,
 });
 ```
 
-This message will be received by:
-- All other participants in the session
-- Yourself (in your own `onAppMessage` handler)
+**Key principle:** Messages are **broadcast to all participants** including the sender. This means:
+- Server sends `question` → Server, Player 1, Player 2, Player 3 all receive it
+- Player 1 sends `answer` → Server, Player 1, Player 2, Player 3 all receive it
 
-## Filtering Your Own Messages
+## Step 1: Define Your Message Schema
 
-Since you receive your own messages, you often need to filter them:
+Use TypeScript to define all message types your game will use:
 
-```typescript
-onAppMessage: async (type, sessionId, data) => {
-  if (type === 'answer') {
-    // Only process answers from OTHER players
-    if (data.from !== wallet.address) {
-      recordAnswer(data.answer);
-    }
-  }
+```typescript twoslash
+import type { MessageSchema } from '@trivia-royale/game';
+import type { Address } from 'viem';
 
-  // But sometimes you DO want your own messages
-  if (type === 'game_start') {
-    // All players (including sender) should initialize
-    initializeGame(data);
-  }
-}
-```
-
-**Rule of thumb**:
-- **Filter out** your own messages when collecting responses (answers, moves, etc.)
-- **Include** your own messages when everyone should react the same way (game_start, etc.)
-
-## Message Ordering
-
-Messages from a single sender are delivered **in order**:
-
-```typescript
-// Server sends three messages
-await server.sendMessage(sessionId, 'question', { round: 1, ... });
-await server.sendMessage(sessionId, 'question', { round: 2, ... });
-await server.sendMessage(sessionId, 'question', { round: 3, ... });
-
-// Players receive them in order: round 1, then 2, then 3 ✓
-```
-
-But messages from **different senders** may arrive in any order:
-
-```typescript
-// Player 1 sends answer (at 10:00:00.100)
-await player1.sendMessage(sessionId, 'answer', { ... });
-
-// Player 2 sends answer (at 10:00:00.080)
-await player2.sendMessage(sessionId, 'answer', { ... });
-
-// Server might receive Player 2's answer first!
-// Even though Player 1 sent theirs earlier
-```
-
-**Solution**: Include timestamps in messages when ordering matters:
-
-```typescript
-answer: {
-  data: {
-    answer: string;
-    timestamp: number;  // Add this!
+interface TriviaGameSchema extends MessageSchema {
+  game_start: {
+    data: { totalRounds: number; entryFee: string };
+  };
+  question: {
+    data: { text: string; round: number };
+  };
+  answer: {
+    data: { answer: string; round: number; from: Address; timestamp: number };
+  };
+  round_result: {
+    data: { winner: Address; correctAnswer: string; round: number };
+  };
+  game_over: {
+    data: { finalWinner: Address; scores: Record<string, number> };
   };
 }
-
-// Then sort by timestamp
-const sortedAnswers = answers.sort((a, b) => a.timestamp - b.timestamp);
 ```
 
-## Auto-Joining Sessions
+TypeScript automatically narrows the `data` type based on the message `type` in your handlers.
 
-The `BetterNitroliteClient` automatically joins sessions when you receive your first message:
+## Step 2: Handle Incoming Messages
 
-```typescript
-// You haven't explicitly joined any sessions
-const sessions = client.getActiveSessions();
-// → []
+Set up `onAppMessage` to receive and process messages:
 
-// Someone sends you a message in session "0xabc123..."
-// Your handler is called:
-onAppMessage: (type, sessionId, data) => {
-  console.log(`Received ${type} in ${sessionId}`);
+```typescript twoslash
+import { createBetterNitroliteClient, type MessageSchema } from '@trivia-royale/game';
+import type { Wallet } from '@trivia-royale/game';
+import type { Address, Hex } from 'viem';
+
+interface TriviaGameSchema extends MessageSchema {
+  question: { data: { text: string; round: number } };
+  answer: { data: { answer: string; round: number; from: Address; timestamp: number } };
 }
 
-// Now the session is tracked as active
-const sessionsAfter = client.getActiveSessions();
-// → ['0xabc123...']
-```
-
-This enables:
-- Receiving invites to sessions you didn't create
-- Joining games without explicit join flow
-- Simplifying client code
-
-## Session Close Notifications
-
-When a session is closed, all participants are notified:
-
-```typescript
-const client = createBetterNitroliteClient({
+declare const wallet: Wallet;
+declare function computeAnswer(text: string): string;
+// ---cut---
+const client = createBetterNitroliteClient<TriviaGameSchema>({
   wallet,
-  onSessionClosed: (sessionId, finalAllocations) => {
-    console.log(`Session ${sessionId} closed`);
-    console.log('Final allocations:', finalAllocations);
+  onAppMessage: async (type, sessionId, data) => {
+    if (type === 'question') {
+      // TypeScript knows data is { text: string; round: number }
+      console.log(`Question ${data.round}: ${data.text}`);
 
-    // Clean up any session-specific state
-    cleanupGame(sessionId);
+      // Respond with answer
+      await client.sendMessage(sessionId, 'answer', {
+        answer: computeAnswer(data.text),
+        round: data.round,
+        from: wallet.address,
+        timestamp: Date.now(),
+      });
+    }
+
+    if (type === 'answer') {
+      // Only process answers from OTHER players
+      if (data.from !== wallet.address) {
+        console.log(`${data.from} answered: ${data.answer}`);
+      }
+    }
   },
 });
 ```
 
-**Note**: Currently ClearNode only notifies the requester (whoever called `closeSession`). Other participants may not receive the notification, so design your application to handle this:
+**Pattern:** Check message type → Process data → Optionally send response
 
-```typescript
-// Server closes session
-await server.closeSession(sessionId, finalAllocations);
+**When to filter:** Since you receive your own messages, filter them out when collecting responses from others (like `answer` messages). Don't filter when everyone should react the same way (like `game_start`).
 
-// Then explicitly notifies players via a message
-await server.sendMessage(sessionId, 'game_over', {
-  finalAllocations,
-});
+## Step 3: Send Messages
 
-// Players handle the game_over message to clean up
-onAppMessage: (type, sessionId, data) => {
-  if (type === 'game_over') {
-    // Remove from active sessions manually
-    cleanupGame(sessionId);
-  }
+Use `sendMessage()` to broadcast to all session participants:
+
+```typescript twoslash
+import { createBetterNitroliteClient, type MessageSchema } from '@trivia-royale/game';
+import type { Hex } from 'viem';
+
+interface TriviaGameSchema extends MessageSchema {
+  question: { data: { text: string; round: number } };
 }
+
+declare const client: ReturnType<typeof createBetterNitroliteClient<TriviaGameSchema>>;
+declare const sessionId: Hex;
+// ---cut---
+// Server broadcasts question to all players
+await client.sendMessage(sessionId, 'question', {
+  text: 'What is the capital of France?',
+  round: 2,
+});
 ```
 
-## Message Handler Patterns
+This broadcasts to:
+- All other participants in the session
+- Yourself (arrives in your `onAppMessage`)
 
-### Pattern 1: Immediate Response
+## Real Example: Trivia Game Round
 
-Respond directly in the handler:
+Here's how a complete round flows in the trivia game (from `packages/trivia-royale/src/game.test.ts:290-343`):
 
 ```typescript
+// Server broadcasts question
+await serverClient.sendMessage(sessionId, 'question', {
+  text: 'What is 2+2?',
+  round: 1,
+});
+
+// All players receive it and auto-respond via their handlers:
+// Player 1's handler:
 onAppMessage: async (type, sessionId, data) => {
-  if (type === 'ping') {
-    // Immediately respond with pong
-    await client.sendMessage(sessionId, 'pong', {
+  if (type === 'question') {
+    await client.sendMessage(sessionId, 'answer', {
+      answer: '4',
+      round: data.round,
+      from: player1.address,
       timestamp: Date.now(),
     });
   }
 }
-```
 
-### Pattern 2: Delayed Response
-
-Schedule response with a delay:
-
-```typescript
-onAppMessage: async (type, sessionId, data) => {
-  if (type === 'question') {
-    // Simulate thinking time
-    setTimeout(async () => {
-      await client.sendMessage(sessionId, 'answer', {
-        answer: computeAnswer(data.text),
-      });
-    }, 1000);  // Answer after 1 second
-  }
-}
-```
-
-### Pattern 3: State Accumulation
-
-Collect messages and process later:
-
-```typescript
-const answers = new Map();
-
+// Server receives all answers and determines winner
 onAppMessage: async (type, sessionId, data) => {
   if (type === 'answer') {
-    // Collect all answers
-    answers.set(data.from, data.answer);
+    answerSubmissions.push(data);
 
-    // When all players answered
-    if (answers.size === numPlayers) {
-      const winner = determineWinner(answers);
-      await client.sendMessage(sessionId, 'round_result', { winner });
+    if (answerSubmissions.length === totalPlayers) {
+      // Find fastest correct answer
+      const correctAnswers = answerSubmissions
+        .filter(a => a.answer === '4')
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      const winner = correctAnswers[0].from;
+
+      // Announce winner
+      await serverClient.sendMessage(sessionId, 'round_result', {
+        winner,
+        correctAnswer: '4',
+        round: 1,
+      });
     }
   }
 }
 ```
 
-### Pattern 4: Event Forwarding
+**Flow:**
+1. Server: broadcasts `question` → Everyone receives it (including server)
+2. Players: each sends `answer` → Everyone receives all answers (including the player who sent it)
+3. Server: collects answers, determines winner, broadcasts `round_result` → Everyone receives it
 
-Forward messages to other parts of your app:
+**Total messages:** 1 question + 3 answers + 1 result = 5 messages, all broadcast to all 4 participants
 
-```typescript
-import { EventEmitter } from 'events';
-const gameEvents = new EventEmitter();
+## Important Details
 
-onAppMessage: async (type, sessionId, data) => {
-  // Emit to your app's event system
-  gameEvents.emit(type, { sessionId, data });
-}
+### Always Include Sender Address
 
-// Elsewhere in your app
-gameEvents.on('question', ({ sessionId, data }) => {
-  updateUI(data.text);
-});
-```
-
-## Error Handling
-
-Handle message sending failures gracefully:
+Since messages broadcast to everyone, include the sender so recipients can identify who sent it:
 
 ```typescript
-try {
-  await client.sendMessage(sessionId, 'move', { x: 5, y: 3 });
-} catch (error) {
-  if (error.message.includes('not active')) {
-    console.error('Session was closed');
-    // Navigate user away from game
-  } else if (error.message.includes('not connected')) {
-    console.error('Lost connection to ClearNode');
-    // Show reconnection UI
-  } else {
-    console.error('Failed to send message:', error);
-  }
-}
-```
-
-## Best Practices
-
-### 1. Always Include Sender Address
-
-When multiple participants send the same message type:
-
-```typescript
-answer: {
+interface AnswerMessage {
   data: {
     answer: string;
-    from: Address;  // ← Always include this!
+    from: Address;  // ← Always include!
   };
 }
 ```
 
-### 2. Add Timestamps for Ordering
+### Add Timestamps for Timing
 
-When timing matters:
+When speed matters (like trivia), include timestamps:
 
 ```typescript
-move: {
+interface AnswerMessage {
   data: {
-    x: number;
-    y: number;
-    timestamp: number;  // ← Enables sorting
+    answer: string;
+    from: Address;
+    timestamp: number;  // ← Enables "fastest correct answer" logic
   };
 }
 ```
 
-### 3. Version Your Messages
-
-For evolving schemas:
+Then sort by timestamp to determine order:
 
 ```typescript
-game_state: {
-  data: {
-    version: 1;  // ← Enables backward compatibility
-    // ... rest of data
-  };
-}
+const sorted = answers.sort((a, b) => a.timestamp - b.timestamp);
+const fastest = sorted[0];
 ```
 
-### 4. Keep Messages Small
+### Message Ordering
 
-Messages are sent over WebSocket - keep them lean:
-
+**Per-sender ordering is guaranteed:**
 ```typescript
-// ✗ Bad: Sending entire game state
-await client.sendMessage(sessionId, 'update', {
-  fullGameState: hugeObject,  // Slow!
-});
+// Server sends 3 questions
+await server.sendMessage(sessionId, 'question', { round: 1, ... });
+await server.sendMessage(sessionId, 'question', { round: 2, ... });
+await server.sendMessage(sessionId, 'question', { round: 3, ... });
 
-// ✓ Good: Send only the change
-await client.sendMessage(sessionId, 'move', {
-  playerId: player,
-  position: { x: 5, y: 3 },  // Fast!
-});
+// All players receive them in order: round 1, 2, 3 ✓
 ```
+
+**Cross-sender ordering is NOT guaranteed:**
+```typescript
+// Player 1 sends answer at 10:00:00.100
+await player1.sendMessage(sessionId, 'answer', { ... });
+
+// Player 2 sends answer at 10:00:00.080 (earlier!)
+await player2.sendMessage(sessionId, 'answer', { ... });
+
+// Server might receive Player 2's first, even though it was sent later
+```
+
+**Solution:** Use timestamps to determine actual order when it matters.
 
 ## Next Steps
 
 Now that you understand message flow:
-- **[Typed Messaging](../building-blocks/typed-messaging)**: Deep dive into message schema patterns
-- **[Ping-Pong Example](../patterns/ping-pong)**: Build a simple message-driven app
-- **[Complete Game](../patterns/complete-game)**: See complex message flows in action
+- **[Typed Messaging](../building-blocks/typed-messaging)**: Deep dive into schema design patterns
+- **[Ping-Pong Example](../patterns/ping-pong)**: Build a minimal message-driven app
+- **[Complete Game](../patterns/complete-game)**: See the full trivia game implementation

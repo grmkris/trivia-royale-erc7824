@@ -9,19 +9,21 @@ This pattern demonstrates **sessions**, **typed messaging**, and **event handler
 
 ## Complete Code
 
-```typescript
-import { createBetterNitroliteClient, MessageSchema } from './client';
-import type { Address } from 'viem';
+```typescript twoslash
+import { createBetterNitroliteClient, MessageSchema } from '@trivia-royale/game';
+import type { Wallet } from '@trivia-royale/game';
+import type { Address, Hex } from 'viem';
 
-// Define message schema
 interface PingPongSchema extends MessageSchema {
-  ping: {
-    data: { from: Address; timestamp: number };
-  };
-  pong: {
-    data: { from: Address; replyTo: number };
-  };
+  ping: { data: { from: Address; timestamp: number } };
+  pong: { data: { from: Address; replyTo: number } };
 }
+
+declare const wallets: {
+  server: Wallet;
+  player1: Wallet;
+};
+// ---cut---
 
 async function pingPongExample() {
   const server = wallets.server;
@@ -30,11 +32,12 @@ async function pingPongExample() {
   // Server tracks pong responses
   const pongResponses: Array<{ from: Address; latency: number }> = [];
 
-  // Create clients with handlers
+  // Create clients with typed message handlers
   const serverClient = createBetterNitroliteClient<PingPongSchema>({
     wallet: server,
     onAppMessage: async (type, sessionId, data) => {
       if (type === 'pong') {
+        // TypeScript knows: data is { from: Address; replyTo: number }
         const latency = Date.now() - data.replyTo;
         pongResponses.push({ from: data.from, latency });
         console.log(`📬 Received pong from ${data.from.slice(0, 10)} (${latency}ms)`);
@@ -46,6 +49,7 @@ async function pingPongExample() {
     wallet: player,
     onAppMessage: async (type, sessionId, data) => {
       if (type === 'ping') {
+        // TypeScript knows: data is { from: Address; timestamp: number }
         console.log(`📬 Received ping from ${data.from.slice(0, 10)}`);
 
         // Auto-respond with pong
@@ -64,7 +68,7 @@ async function pingPongExample() {
     playerClient.connect()
   ]);
 
-  // Create session (simplified - server only, no distributed signing)
+  // Create session
   const request = serverClient.prepareSession({
     participants: [server.address, player.address],
     allocations: [
@@ -78,7 +82,7 @@ async function pingPongExample() {
     playerClient.signSessionRequest(request)
   ]);
 
-  const sessionId = await serverClient.createSession(request, [serverSig as `0x${string}`, playerSig as `0x${string}`]);
+  const sessionId = await serverClient.createSession(request, [serverSig, playerSig]);
   console.log(`✅ Session created: ${sessionId}\n`);
 
   // Send ping
@@ -113,7 +117,10 @@ async function pingPongExample() {
 
 ### 1. Message Schema
 Defines the structure of messages:
-```typescript
+```typescript twoslash
+import type { MessageSchema } from '@trivia-royale/game';
+import type { Address } from 'viem';
+
 interface PingPongSchema extends MessageSchema {
   ping: { data: { from: Address; timestamp: number } };
   pong: { data: { from: Address; replyTo: number } };
@@ -121,14 +128,30 @@ interface PingPongSchema extends MessageSchema {
 ```
 
 ### 2. Event Handlers
-Clients react to messages asynchronously:
-```typescript
-onAppMessage: async (type, sessionId, data) => {
-  if (type === 'ping') {
-    // Respond immediately
-    await client.sendMessage(sessionId, 'pong', { ... });
-  }
+Clients react to messages asynchronously with automatic type narrowing:
+```typescript twoslash
+import { createBetterNitroliteClient, MessageSchema } from '@trivia-royale/game';
+import type { Address, Hex } from 'viem';
+
+interface PingPongSchema extends MessageSchema {
+  ping: { data: { from: Address; timestamp: number } };
+  pong: { data: { from: Address; replyTo: number } };
 }
+
+declare const client: ReturnType<typeof createBetterNitroliteClient<PingPongSchema>>;
+declare const sessionId: Hex;
+declare const myAddress: Address;
+// ---cut---
+
+client.onAppMessage = async (type, sessionId, data) => {
+  if (type === 'ping') {
+    // data is automatically { from: Address; timestamp: number }
+    await client.sendMessage(sessionId, 'pong', {
+      from: myAddress,
+      replyTo: data.timestamp
+    });
+  }
+};
 ```
 
 ### 3. Broadcasting
