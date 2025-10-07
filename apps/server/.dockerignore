@@ -1,0 +1,12 @@
+node_modules
+dist
+.turbo
+coverage
+*.test.ts
+*.test.js
+.env
+.env.local
+.git
+.gitignore
+README.md
+data/*.json

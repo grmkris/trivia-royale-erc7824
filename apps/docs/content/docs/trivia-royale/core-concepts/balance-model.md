@@ -12,15 +12,15 @@ The single most important concept to understand when building with Yellow SDK is
 Your funds exist in **four distinct locations**, each serving a specific purpose:
 
 ```mermaid
-graph TD
-    A["1. WALLET<br/>Your standard ERC-20 balance<br/>• Fully in your control<br/>• Requires gas for transactions<br/>• Can be used anywhere"]
-    B["2. CUSTODY CONTRACT<br/>Escrowed in Yellow custody contract<br/>• On-chain but locked<br/>• Secured by contract<br/>• Used to fund/resize channels"]
-    C["3. CHANNEL<br/>State channel with broker<br/>• Off-chain state, on-chain settlement<br/>• Enables instant transactions<br/>• Can be allocated to ledger"]
-    D["4. LEDGER<br/>Off-chain balance in ClearNode<br/>• Instant, gasless p2p transfers<br/>• Used for payments and sessions<br/>• Backed by channel capacity"]
+graph LR
+    A["💳 WALLET<br/>ERC-20 balance<br/>Requires gas"]
+    B["🔒 CUSTODY<br/>Custody contract<br/>Escrowed on-chain"]
+    C["📡 CHANNEL<br/>State channel"]
+    D["⚡ LEDGER<br/>Net balance<br/>• send/receive<br/>• sessions"]
 
-    A -->|deposit| B
-    B -->|resize| C
-    C -->|allocate| D
+    A <-->|deposit /<br/>withdraw| B
+    B <-->|open/resize/close| C
+    C -.->|backs capacity| D
 
     style A fill:#e1f5ff
     style B fill:#fff4e1
@@ -44,13 +44,13 @@ This might seem complex at first, but each layer serves a critical purpose:
 
 ### Layer 3: Channel (State Channel with Broker)
 - **What it is**: A bilateral state channel between you and Yellow's broker
-- **When you use it**: Provides capacity for off-chain operations
-- **Why it exists**: Enables instant state updates without gas fees
+- **Operations**: Open channel, resize (add/remove funds), close channel
+- **Why it exists**: Provides **capacity** that backs your off-chain operations (ledger balances and sessions)
 
-### Layer 4: Ledger (Off-Chain Balance)
-- **What it is**: Virtual balance tracked by ClearNode
-- **When you use it**: For actual application logic (payments, games, etc.)
-- **Why it exists**: Allows peer-to-peer value transfer without touching on-chain state
+### Layer 4: Ledger (Off-Chain Net Balance)
+- **What it is**: Your net position tracked by ClearNode (can go negative up to channel capacity)
+- **Operations**: Send/receive (p2p transfers), sessions (allocate from channel to session)
+- **Why it exists**: Enables instant, gasless value transfer without touching on-chain state
 
 ## Checking All Balances
 
@@ -60,26 +60,9 @@ The `getBalances()` method returns all four balance types:
 import type { BetterNitroliteClient } from '@trivia-royale/game';
 
 declare const client: BetterNitroliteClient;
-declare function formatUSDC(amount: bigint): string;
 
 const balances = await client.getBalances();
 //    ^?
-
-console.log({
-  wallet: formatUSDC(balances.wallet),
-  //                         ^?
-  custodyContract: formatUSDC(balances.custodyContract),
-  channel: formatUSDC(balances.channel),
-  ledger: formatUSDC(balances.ledger),
-});
-
-// Example output:
-// {
-//   wallet: "100.00 USDC",          // Standard ERC-20 balance
-//   custodyContract: "0.00 USDC",   // Nothing in escrow
-//   channel: "8.00 USDC",           // 8 USDC locked in channel
-//   ledger: "2.00 USDC"             // 2 USDC allocated for payments
-// }
 ```
 
 ## Fund Flow Topology
@@ -90,19 +73,14 @@ Understanding how funds move between layers is critical:
 
 ```mermaid
 graph LR
-    A[WALLET<br/>In your control<br/>Standard ERC-20]
-    B[CUSTODY<br/>Escrowed<br/>Can resize channel]
-    C[CHANNEL<br/>Locked<br/>Can be allocated]
-    D[LEDGER<br/>Ready for<br/>instant payments]
+    A[WALLET<br/>Standard<br/>ERC-20]
+    B[CUSTODY<br/>Escrowed<br/>on-chain]
+    C[CHANNEL<br/>State<br/>channel]
+    D[LEDGER<br/>Net<br/>balance]
 
     A -->|deposit| B
     B -->|resize| C
-    C -->|allocate| D
-
-    style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style C fill:#ffe1f5
-    style D fill:#e1ffe1
+    C -.->|backs| D
 ```
 
 **Example: Preparing 10 USDC for a game**
@@ -115,7 +93,6 @@ declare const client: BetterNitroliteClient;
 // ---cut---
 // Step 1: Start with wallet balance
 const before = await client.getBalances();
-//    ^?
 // { wallet: 100, custody: 0, channel: 0, ledger: 0 }
 
 // Step 2: Deposit moves: wallet → custody → channel
@@ -124,39 +101,29 @@ await client.deposit(parseUSDC('10'));
 const after = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 10, ledger: 0 }
 // Note: deposit() does BOTH wallet→custody AND custody→channel
-
-// Step 3: Channel funds are automatically available
-// The 10 USDC in channel can now be:
-// - Allocated to ledger for payments
-// - Used in application sessions
 ```
 
 ### Reverse Flow (Withdrawing Funds)
 
 ```mermaid
 graph RL
-    D[LEDGER<br/>Must deallocate<br/>first]
-    C[CHANNEL<br/>Must close/drain<br/>channel]
-    B[CUSTODY<br/>Escrowed<br/>briefly]
-    A[WALLET<br/>Back in your<br/>control]
+    D[LEDGER<br/>Net<br/>balance]
+    C[CHANNEL<br/>State<br/>channel]
+    B[CUSTODY<br/>Escrowed<br/>on-chain]
+    A[WALLET<br/>Standard<br/>ERC-20]
 
-    D -->|deallocate| C
+    D -.->|settle to| C
     C -->|resize| B
     B -->|withdraw| A
-
-    style D fill:#e1ffe1
-    style C fill:#ffe1f5
-    style B fill:#fff4e1
-    style A fill:#e1f5ff
 ```
 
 **Example: Withdrawing all funds**
 
 ```typescript twoslash
-import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { BetterNitroliteClient } from '@trivia-royale/game';
 
 declare const client: BetterNitroliteClient;
-
+// ---cut---
 const balances = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 8, ledger: 2 }
 
@@ -181,20 +148,19 @@ const afterWithdraw = await client.getBalances();
 ### Pattern 1: Depositing for the First Time
 
 ```typescript twoslash
-import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
 
 declare const client: BetterNitroliteClient;
-declare function parseUSDC(amount: string): bigint;
-
+// ---cut---
 // You have: { wallet: 100, custody: 0, channel: 0, ledger: 0 }
 await client.deposit(parseUSDC('10'));
-//           ^?
 // You now have: { wallet: 90, custody: 0, channel: 10, ledger: 0 }
 
 // The deposit() method:
 // 1. Approves custody contract to spend USDC
 // 2. Calls custody.deposit() → wallet to custody
-// 3. Creates OR resizes channel → custody to channel
+// 3. Opens OR resizes channel → custody to channel
 ```
 
 ### Pattern 2: Adding More Funds to Existing Channel
@@ -213,13 +179,13 @@ await client.deposit(parseUSDC('5'));
 ### Pattern 3: Sending Peer-to-Peer Payment
 
 ```typescript twoslash
-import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
 import type { Address } from 'viem';
 
 declare const client: BetterNitroliteClient;
 declare const recipient: Address;
-declare function parseUSDC(amount: string): bigint;
-
+// ---cut---
 // You have: { wallet: 90, custody: 0, channel: 10, ledger: 0 }
 await client.send({ to: recipient, amount: parseUSDC('1') });
 //           ^?
@@ -260,13 +226,13 @@ Your ledger balance is a **net position** across all your off-chain activity:
 **Understanding negative ledger balances**:
 
 ```typescript twoslash
-import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
 import type { Address } from 'viem';
 
 declare const client: BetterNitroliteClient;
 declare const recipient: Address;
-declare function parseUSDC(amount: string): bigint;
-
+// ---cut---
 // You have a channel with 10 USDC
 const balances = { channel: 10n, ledger: 0n };
 //    ^?
@@ -308,22 +274,24 @@ const totalAvailable =
 
 ### 4. Automatic Operations
 The `BetterNitroliteClient` handles complexity for you:
-- `deposit()` manages wallet → custody → channel
-- `withdraw()` manages ledger → channel → custody → wallet
-- `send()` updates ledger balances off-chain
+- `deposit()` manages wallet → custody → channel (opens or resizes channel)
+- `withdraw()` manages ledger → channel → custody → wallet (settles ledger and resizes channel)
+- `send()` / `receive()` updates ledger balances off-chain (p2p transfers)
+- Sessions allocate capacity from channel (not from ledger)
 
 ## Visualizing a Complete Flow
 
 Let's trace funds through a realistic scenario:
 
 ```typescript twoslash
-import { BetterNitroliteClient } from '@trivia-royale/game';
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
 import type { Address } from 'viem';
+
 declare const client: BetterNitroliteClient;
 declare const player2: Address;
 declare const balances: { wallet: bigint; custodyContract: bigint; channel: bigint; ledger: bigint };
-declare function parseUSDC(amount: string): bigint;
-
+// ---cut---
 // Starting state
 // { wallet: 100, custody: 0, channel: 0, ledger: 0 }
 

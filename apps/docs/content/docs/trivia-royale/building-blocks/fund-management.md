@@ -28,12 +28,18 @@ Under the hood, these use low-level resize and allocate operations.
 
 When you have no channel, `deposit()` creates one:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+// ---cut---
 // Starting state
 const before = await client.getBalances();
 // { wallet: 100, custody: 0, channel: 0, ledger: 0 }
 
 await client.deposit(parseUSDC('10'));
+//           ^?
 
 const after = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 10, ledger: 0 }
@@ -56,12 +62,18 @@ graph LR
 
 When you already have a channel, `deposit()` resizes it:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+// ---cut---
 // Starting state (channel exists)
 const before = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 10, ledger: 0 }
 
 await client.deposit(parseUSDC('5'));
+//           ^?
 
 const after = await client.getBalances();
 // { wallet: 85, custody: 0, channel: 15, ledger: 0 }
@@ -89,11 +101,17 @@ The `withdraw()` function only withdraws the **requested amount** and **keeps th
 
 ### Simple Withdrawal (No Ledger Balance)
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+// ---cut---
 const before = await client.getBalances();
 // { wallet: 85, custody: 0, channel: 15, ledger: 0 }
 
 await client.withdraw(parseUSDC('5'));
+//           ^?
 
 const after = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 10, ledger: 0 }
@@ -115,12 +133,18 @@ graph LR
 
 When you have a ledger balance, it must be deallocated first:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+// ---cut---
 const before = await client.getBalances();
 // { wallet: 85, custody: 0, channel: 10, ledger: 5 }
 // Note: Total available = 10 + 5 = 15 USDC
 
 await client.withdraw(parseUSDC('10'));
+//           ^?
 
 const after = await client.getBalances();
 // { wallet: 95, custody: 0, channel: 5, ledger: 0 }
@@ -144,14 +168,20 @@ graph LR
 
 You can withdraw all available funds while keeping the channel open:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+// ---cut---
 const before = await client.getBalances();
+//    ^?
 // { wallet: 85, custody: 0, channel: 10, ledger: 5 }
 
 const total = before.channel + before.ledger + before.custodyContract;
 // total = 15 USDC
 
 await client.withdraw(total);
+//           ^?
 
 const after = await client.getBalances();
 // { wallet: 100, custody: 0, channel: 0, ledger: 0 }
@@ -363,11 +393,19 @@ Always persist session keys in production applications.
 
 The `send()` method transfers value via **ledger balances**:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC } from '@trivia-royale/game';
+import type { Address } from 'viem';
+
+declare const client: BetterNitroliteClient;
+declare const recipientAddress: Address;
+// ---cut---
 const before = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 10, ledger: 0 }
 
 await client.send({ to: recipientAddress, amount: parseUSDC('3') });
+//           ^?
 
 const after = await client.getBalances();
 // { wallet: 90, custody: 0, channel: 10, ledger: -3 }
@@ -398,8 +436,14 @@ The recipient's ledger balance increased by 3 USDC, backed by the sender's chann
 
 Always check total available before operations:
 
-```typescript
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { formatUSDC } from '@trivia-royale/game';
+
+declare const client: BetterNitroliteClient;
+// ---cut---
 const balances = await client.getBalances();
+//    ^?
 
 const totalAvailable =
   balances.wallet +           // Can deposit from here
@@ -526,33 +570,43 @@ if (balances.channel < MIN_CHANNEL_BALANCE) {
 
 Here's a complete flow from start to finish:
 
-```typescript
-import { createBetterNitroliteClient } from './client';
-import { parseUSDC, formatUSDC } from './core/erc20';
+```typescript twoslash
+import type { BetterNitroliteClient } from '@trivia-royale/game';
+import { parseUSDC, formatUSDC } from '@trivia-royale/game';
+import type { Address } from 'viem';
 
+declare const createBetterNitroliteClient: (config: any) => BetterNitroliteClient;
+declare const wallet: any;
+declare const recipientAddress: Address;
+// ---cut---
 async function completeFlow() {
   const client = createBetterNitroliteClient({ wallet });
   await client.connect();
+  //           ^?
 
   console.log('=== Initial State ===');
   let balances = await client.getBalances();
+  //                   ^?
   console.log(`Wallet: ${formatUSDC(balances.wallet)}`);
   console.log(`Channel: ${formatUSDC(balances.channel)}`);
   console.log(`Ledger: ${formatUSDC(balances.ledger)}`);
 
   console.log('\n=== Depositing 10 USDC ===');
   await client.deposit(parseUSDC('10'));
+  //           ^?
   balances = await client.getBalances();
   console.log(`Channel: ${formatUSDC(balances.channel)}`);
 
   console.log('\n=== Sending 3 USDC ===');
   await client.send({ to: recipientAddress, amount: parseUSDC('3') });
+  //           ^?
   balances = await client.getBalances();
   console.log(`Ledger: ${formatUSDC(balances.ledger)}`);
 
   console.log('\n=== Withdrawing All ===');
   const total = balances.channel + balances.ledger + balances.custodyContract;
   await client.withdraw(total);
+  //           ^?
   balances = await client.getBalances();
   console.log(`Wallet: ${formatUSDC(balances.wallet)}`);
   console.log(`Channel: ${formatUSDC(balances.channel)}`);

@@ -5,7 +5,12 @@
   "private": true,
   "scripts": {
     "dev": "bun --hot src/index.ts",
-    "build": "bun build src/index.ts --outdir=dist"
+    "build": "bun build src/index.ts --outdir=dist",
+    "docker:build": "docker build -t kristjangrm/trivia-royale-server:latest -f Dockerfile ../..",
+    "docker:push": "docker push kristjangrm/trivia-royale-server:latest",
+    "docker:run": "docker run -d -p 3002:3002 --env-file .env -v $(pwd)/data:/app/apps/server/data --name trivia-royale-server kristjangrm/trivia-royale-server:latest",
+    "docker:logs": "docker logs -f trivia-royale-server",
+    "docker:stop": "docker stop trivia-royale-server && docker rm trivia-royale-server"
   },
   "dependencies": {
     "@trivia-royale/game": "workspace:*",

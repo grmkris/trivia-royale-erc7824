@@ -323,9 +323,9 @@ function resetLobby() {
 // Create Hono app
 const app = new Hono();
 
-// Enable CORS for frontend
+// Disable CORS because this is a demo server
 app.use('/*', cors({
-  origin: 'https://localhost:3001', // Next.js dev server with HTTPS
+  origin: '*',
   credentials: true,
 }));
 
