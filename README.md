@@ -1,91 +1,104 @@
-# DevRel Role Takehome Exercise
+# Trivia Royale
 
-**Role:** Developer Relations Engineer
+A multiplayer trivia game built with Yellow SDK. Shows how to build applications with instant, gasless transactions using state channels.
 
-**Estimated Time:** ~5–7 hours
+Three players answer questions, fastest correct answers win. Prize pool splits 50/30/20. All transactions happen off-chain until the game ends and prizes get distributed.
 
-**Goal:** Assess your ability to **build with the Yellow SDK, document it**, and **communicate technical concepts** effectively. The following exercise is designed to evaluate your ability to:
+**Use this as a guide** to understand Yellow protocol's core features - balance management, sessions, and message passing.
 
-- Understand **Yellow SDK**’s purpose and usage
-- Build a **small demo app** using the SDK
-- Write **clear developer-facing documentation**
-- Showcase **communication skills** by explaining technical concepts
-- Optionally create **content** (blog/video) to demonstrate DevRel aptitude
+[Documentation](http://localhost:3000/docs) | [Docker Hub](https://hub.docker.com/r/kristjangrm/trivia-royale-server)
 
-## **Context**
+---
 
-Yellow SDK is a developer toolkit that simplifies building decentralized applications on top of the **Yellow Network**. As a DevRel Engineer, you’ll help developers understand how to integrate the SDK, troubleshoot issues, and **create engaging technical content**.
+## Quick Start
 
-This exercise simulates a typical scenario: you’ll explore the SDK, build a small integration, and produce developer-friendly documentation.
+```bash
+# 1. Start ClearNode (Yellow's transaction processor)
+docker-compose up -d
 
-## **The Tasks**
+# 2. Start game server
+bun run dev:server
 
-### **1. Explore the Yellow SDK**
+# 3. Start web app
+bun run dev:web
+```
 
-- Review the SDK’s documentation and example code.
-- Understand its main features:
-    - Authentication
-    - Connecting to the Yellow Network
-    - Create app sessions and use transfers
+Open http://localhost:3000
 
-*Deliverable:* A short summary (`SUMMARY.md`, ~200–300 words) describing:
+---
 
-- What the SDK does
-- Key modules/features
-- One potential use case where it shines
+## What's Here
 
-### **2. Build a Mini Demo App**
+```
+trivia-royale/
+├── apps/server/          # Game API using Yellow SDK
+├── apps/web/            # Next.js frontend
+├── apps/docs/           # Full implementation guide
+├── packages/trivia-royale/  # Yellow SDK integration
+└── docker-compose.yml    # ClearNode infrastructure
+```
 
-Create a simple app with the Yellow SDK that can be used to showcase its advantages.
+**Server** - Hono API handling lobby, game logic, and Yellow SDK operations
+**Web** - React frontend for playing
+**Core Package** - Wraps Yellow SDK with game-specific types
+**Docs** - Complete guides on balance model, sessions, messaging patterns
 
-**Requirements:**
+---
 
-- Keep it small and focused (≤200 lines of code recommended).
-- Use **Golang** or **TypeScript** (preferred).
-- Include a `README.md` with setup instructions and usage examples.
+## Tech Stack
 
-### **3. Write Developer-Friendly Documentation**
+- [Yellow SDK](https://github.com/erc7824/nitrolite) - State channel framework (ERC-7824)
+- Bun + TypeScript
+- Hono (server), Next.js (web)
+- Docker (ClearNode + Postgres)
 
-- Add a short **“Getting Started” guide** (`GETTING_STARTED.md`, ~500 words).
-- Explain:
-    - How to install and configure the SDK
-    - How to authenticate
-    - How to run your demo app
+---
 
-This is your chance to **show your technical writing skills**.
+## Documentation
 
-### **4. Create Developer-Focused Content** *(Optional, Bonus)*
+Run the docs site locally:
 
-- Record a **2–3 minute video walkthrough** **OR** write a **blog-style article** introducing the SDK and your demo app.
-- Imagine you’re publishing it for the Yellow developer community.
-- Focus on clarity, developer empathy, and engaging storytelling.
+```bash
+bun run dev:docs
+```
 
-## **Submission Guidelines**
+Visit http://localhost:3000/docs to learn:
+- How the 4-layer balance system works
+- Coordinating multi-party sessions
+- Message passing patterns
+- Fund management flows
 
-- Push your solution to a **public GitHub repository**.
-- The repo should include:
-    - `SUMMARY.md`
-    - Demo app source code
-    - `README.md`
-    - `GETTING_STARTED.md`
-    - *(Optional)* blog/video link
-- Send us the link when done.
+---
 
-## Submission Evaluation
+## Deployment
 
-Please note that the hiring committee shall evaluate submissions according to the following criteria:
+Server is available as a Docker image:
 
-| **Category** | **What We’re Looking For** | Mark |
-| --- | --- | --- |
-| **Technical Skills** | Ability to integrate and use the SDK effectively |  |
-| **Clarity** | Easy-to-follow docs and code organization |  |
-| **Developer Empathy** | How well you anticipate a developer’s needs |  |
-| **Creativity** | Fun, unique demo ideas and presentation |  |
-| **Communication** | Writing, storytelling, and optional content quality |  |
+```bash
+docker pull kristjangrm/trivia-royale-server:latest
+docker run -d -p 3002:3002 --env-file .env kristjangrm/trivia-royale-server
+```
 
-**Mark** values shall be expressed on a 1 to 5 scale.
+See `apps/server/README.md` for configuration.
 
-## References and Resources
-* [Nitrolite Framework](https://github.com/erc7824/nitrolite)
-* [Yellow SDK](https://github.com/erc7824/nitrolite/tree/main/sdk)
-* [ERC-7824 specifications and docs](https://erc7824.org)
+---
+
+## Setup
+
+Full setup instructions in the [documentation](http://localhost:3000/docs), but quick version:
+
+1. Install Bun: `curl -fsSL https://bun.sh/install | bash`
+2. Copy `.env.example` to `.env` and configure:
+   - Add your 12-word mnemonic phrase
+   - Add your Infura or Alchemy RPC URL (get free API key at [infura.io](https://infura.io) or [alchemy.com](https://alchemy.com))
+   - Update `BROKER_PRIVATE_KEY` to match index 1 from your mnemonic
+3. Start ClearNode: `bun run clearnode:start`
+4. Fund your wallet on Sepolia testnet
+5. Run `bun install`
+
+---
+
+## Learn More
+
+- [Yellow SDK Documentation](https://github.com/erc7824/nitrolite)
+- [ERC-7824 Specification](https://erc7824.org)

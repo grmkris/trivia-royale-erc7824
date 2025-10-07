@@ -79,4 +79,4 @@ bun run docker:push
 
 ## Data Persistence
 
-Session keys are stored in `./data` directory. This is mounted as a volume in docker-compose to persist across container restarts.
+Session keys are stored in `./data` directory. Mount this as a volume to persist across container restarts.

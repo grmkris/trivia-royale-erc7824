@@ -81,6 +81,10 @@ export type BetterNitroliteClient<T extends MessageSchema = any> = {
   /**
    * Prepares an unsigned session request
    * @param params - Session parameters
+   * @param params.participants - Array of participant addresses
+   * @param params.allocations - Initial fund allocations for each participant
+   * @param params.weights - Optional voting weights for each participant (defaults to caller having 100%, others 0)
+   * @param params.quorum - Optional quorum threshold for decisions (defaults to 100)
    * @returns Unsigned session request object
    */
   prepareSession: (params: {
@@ -90,6 +94,8 @@ export type BetterNitroliteClient<T extends MessageSchema = any> = {
       asset: string;
       amount: string;
     }>;
+    weights?: number[];
+    quorum?: number;
   }) => NitroliteRPCMessage;
 
   /**
@@ -97,7 +103,7 @@ export type BetterNitroliteClient<T extends MessageSchema = any> = {
    * @param request - Session request to sign
    * @returns Signature string
    */
-  signSessionRequest: (request: NitroliteRPCMessage) => Promise<string>;
+  signSessionRequest: (request: NitroliteRPCMessage) => Promise<`0x${string}`>;
 
   /**
    * Creates a new app session with collected signatures
@@ -708,17 +714,29 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
   };
 
   const prepareSession = (params: {
-  participants: Address[];
+    participants: Address[];
     allocations: Array<{
       participant: Address;
       asset: string;
       amount: string;
     }>;
+    weights?: number[];
+    quorum?: number;
   }): NitroliteRPCMessage=> {
-    // Determine weights: server (this wallet) gets 100, others get 0
-    const weights = params.participants.map(p =>
+    // Use provided weights or default to server-controlled (caller gets 100%, others 0)
+    const weights = params.weights ?? params.participants.map(p =>
       p.toLowerCase() === props.wallet.address.toLowerCase() ? 100 : 0
     );
+
+    // Validate weights length matches participants
+    if (weights.length !== params.participants.length) {
+      throw new Error(
+        `Weights length (${weights.length}) must match participants length (${params.participants.length})`
+      );
+    }
+
+    // Use provided quorum or default to 100
+    const quorum = params.quorum ?? 100;
 
     // Create unsigned request
     const request = NitroliteRPC.createRequest({
@@ -728,7 +746,7 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
           protocol: 'NitroRPC/0.4',
           participants: params.participants,
           weights,
-          quorum: 100,
+          quorum,
           challenge: 0,
           nonce: Date.now(),
         },
@@ -742,10 +760,10 @@ export const createBetterNitroliteClient = <T extends MessageSchema = any>(props
     return request;
   };
 
-  const signSessionRequest = async (request: NitroliteRPCMessage): Promise<string> => {
+  const signSessionRequest = async (request: NitroliteRPCMessage): Promise<`0x${string}`> => {
     if(!request.req) throw new Error ("Missing request.req")
     const signature = await props.wallet.sessionSigner.sign(request.req);
-    return signature;
+    return signature as `0x${string}`;
   };
 
   const createSession = async (request: NitroliteRPCMessage, signatures: `0x${string}`[]): Promise<Hex> => {

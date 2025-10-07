@@ -19,13 +19,10 @@ graph LR
     D["⚡ LEDGER<br/>Net balance<br/>• send/receive<br/>• sessions"]
 
     A <-->|deposit /<br/>withdraw| B
-    B <-->|open/resize/close| C
+    B <-->|open/resize/close<br/>fund movement| C
+    B -.->|custody balance| C
+    D -.->|ledger balance| C
     C -.->|backs capacity| D
-
-    style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style C fill:#ffe1f5
-    style D fill:#e1ffe1
 ```
 
 ## Why Four Layers?

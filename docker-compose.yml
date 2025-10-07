@@ -96,15 +96,16 @@ services:
         condition: service_completed_successfully
     environment:
       # Broker signing key (Broker wallet - index 1 from mnemonic)
-      # IMPORTANT: This must be derived from mnemonic index 1, NOT index 0
-      # The Funding wallet (index 0) is separate and only used for distribution
-      BROKER_PRIVATE_KEY: ${BROKER_PRIVATE_KEY:-0x718758aaed9cd315e6140859867422e8df4ea4143d989769edb4be2eee23aea0}
+      # IMPORTANT: Must be set in .env file - no default for security
+      BROKER_PRIVATE_KEY: ${BROKER_PRIVATE_KEY}
 
       # Ethereum Sepolia Network Configuration (Chain ID: 11155111)
       ETHEREUM_SEPOLIA_CUSTODY_CONTRACT_ADDRESS: ${ETHEREUM_SEPOLIA_CUSTODY_CONTRACT_ADDRESS:-0x019B65A265EB3363822f2752141b3dF16131b262}
       ETHEREUM_SEPOLIA_ADJUDICATOR_ADDRESS: ${ETHEREUM_SEPOLIA_ADJUDICATOR_ADDRESS:-0x7c7ccbc98469190849BCC6c926307794fDfB11F2}
       ETHEREUM_SEPOLIA_BALANCE_CHECKER_ADDRESS: ${ETHEREUM_SEPOLIA_BALANCE_CHECKER_ADDRESS:-0x730dB3A1D3Ca47e7BaEb260c24C74ED4378726Bc}
-      ETHEREUM_SEPOLIA_BLOCKCHAIN_RPC: ${ETHEREUM_SEPOLIA_BLOCKCHAIN_RPC:-wss://sepolia.infura.io/ws/v3/7d77649dbd2e49b3b418755505b46874}
+
+      # RPC URL - IMPORTANT: Must be set in .env file with your own API key
+      ETHEREUM_SEPOLIA_BLOCKCHAIN_RPC: ${ETHEREUM_SEPOLIA_BLOCKCHAIN_RPC}
 
       # Database Configuration
       CLEARNODE_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-postgres}?sslmode=disable

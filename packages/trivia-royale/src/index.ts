@@ -33,3 +33,5 @@ export type {
   SignatureSubmission,
   GameState,
 } from './game-types';
+
+export type { NitroliteRPCMessage } from '@erc7824/nitrolite';

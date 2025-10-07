@@ -13,7 +13,11 @@
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
-    "dev:server": "turbo -F server dev"
+    "dev:server": "turbo -F server dev",
+    "dev:docs": "turbo -F docs dev",
+    "clearnode:start": "docker-compose up -d",
+    "clearnode:stop": "docker-compose down",
+    "clearnode:logs": "docker-compose logs -f clearnode"
   },
   "dependencies": {},
   "devDependencies": {

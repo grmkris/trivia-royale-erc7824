@@ -5,27 +5,38 @@ description: Learn Yellow SDK state channels through a complete multiplayer game
 
 # Trivia Royale Guide
 
-Welcome to the comprehensive guide for building state channel applications with the Yellow SDK. This documentation is built from real-world experience implementing **Trivia Royale**, a multiplayer trivia game that demonstrates all core concepts of state channels.
+A practical guide for building state channel applications with the Yellow SDK. This documentation is built from real-world experience implementing **Trivia Royale**, a multiplayer trivia game that demonstrates core state channel concepts through working code.
 
-## Why This Guide Exists
+## Core Concepts
 
-The official Yellow SDK documentation covers the low-level protocol details, but many developers struggle with:
+Before building with state channels, you need to understand three fundamental concepts:
 
-- **Understanding the balance model** - Why are there 4 different balance types?
-- **Fund management** - How do I move money between wallet, custody, channel, and ledger?
-- **Distributed sessions** - How do multiple parties coordinate to create a session?
-- **Session messaging** - How do you send messages between parties in a session?
-- **Complete flows** - What does a real application look like end-to-end?
+### The Balance Model
 
-This guide answers those questions with **practical patterns extracted from production code**.
+State channels use a 4-layer balance system where funds flow through distinct layers:
+- **Wallet Balance** - Your on-chain ETH (starting point)
+- **Custody Balance** - Funds deposited to Yellow's smart contract
+- **Channel Balance** - Your capacity in a payment channel
+- **Ledger Balance** - Allocated funds within application sessions (can be negative)
 
-## Learning Path
+Understanding this model is critical because different operations require funds in different layers, and withdrawals must traverse all layers in reverse.
 
-We recommend following this order:
+### Application Sessions
 
-### 1. Core Concepts
+Sessions are isolated instances where participants interact with instant, gasless transactions. Each session defines:
+- Who can participate
+- How much each participant stakes
+- How funds are distributed when the interaction completes
 
-Start here to understand the fundamental architecture before writing code:
+Sessions enable typed, broadcast messaging between participants and handle fund distribution automatically.
+
+### Message Flow
+
+Clients communicate asynchronously through the ClearNode broker. The architecture:
+- ClearNode broadcasts messages to all session participants
+- You must handle broadcasting your own messages
+- Message ordering and timing affect application behavior
+- Typed schemas enable auto-joining and state synchronization
 
 <Cards>
   <Card
@@ -45,9 +56,9 @@ Start here to understand the fundamental architecture before writing code:
   />
 </Cards>
 
-### 2. Building Blocks
+## Building Blocks
 
-Learn the practical patterns you'll use in every application:
+Practical patterns you'll use in every application:
 
 <Cards>
   <Card
@@ -72,9 +83,9 @@ Learn the practical patterns you'll use in every application:
   />
 </Cards>
 
-### 3. Patterns & Examples
+## Patterns & Examples
 
-See complete implementations you can adapt for your use case:
+Complete implementations you can adapt:
 
 <Cards>
   <Card
@@ -98,28 +109,6 @@ See complete implementations you can adapt for your use case:
     href="/docs/trivia-royale/patterns/error-handling"
   />
 </Cards>
-
-## What You'll Learn
-
-By the end of this guide, you'll understand:
-
-✅ **The 4-layer balance system** and how value flows between them
-✅ **When to use resize vs allocate** operations
-✅ **How to coordinate multiple participants** to create sessions
-✅ **Type-safe message schemas** for robust applications
-✅ **Complete fund lifecycle** from deposit to prize distribution
-✅ **Balance verification** and fund conservation principles
-✅ **Error handling** for connection drops and insufficient funds
-✅ **Testing strategies** for state channel applications
-
-## Code First Philosophy
-
-This guide prioritizes **working code over abstract theory**. Every concept is demonstrated with:
-
-- Real TypeScript code from the Trivia Royale implementation
-- Visual diagrams showing data flow
-- Balance checks at each step
-- Common pitfalls and how to avoid them
 
 ## Prerequisites
 
@@ -147,6 +136,3 @@ You do **not** need deep blockchain knowledge or state channel theory - we'll ex
   />
 </Cards>
 
-## Ready to Start?
-
-Jump into **[The Balance Model](/docs/trivia-royale/core-concepts/balance-model)** to understand the foundation, or skip to **[Simple Payment](/docs/trivia-royale/patterns/simple-payment)** if you prefer to learn by doing.

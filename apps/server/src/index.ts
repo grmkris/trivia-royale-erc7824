@@ -13,7 +13,6 @@ import {
   formatUSDC,
   type TriviaGameSchema,
   type LobbyState,
-  type LobbyPlayer,
   type SignatureSubmission,
   type GameState,
 } from '@trivia-royale/game';
@@ -22,24 +21,17 @@ import { createWalletClient, createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
 import { z } from 'zod';
 import { createFileSystemKeyManager } from '@trivia-royale/game/fs-key-manager';
-/**
- * FileSystem Key Manager (Node.js only)
- *
- * Provides filesystem-based session key persistence for Node.js environments.
- * DO NOT import this module in browser/React environments - use './key-manager' instead.
- */
-
 import type { Address } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import fs from 'fs';
 
 
-// Create server wallet from mnemonic (index 2 = server wallet, same as loadWallets().server)
+// Environment validation
 const envSchema = z.object({
   MNEMONIC: z.string(),
 });
 const env = envSchema.parse(Bun.env);
 
+// Create server wallet from mnemonic
+// HD Path: m/44'/60'/0'/0/2 (index 2 = server, 0 = funding, 1 = broker)
 const account = mnemonicToAccount(env.MNEMONIC, { accountIndex: 2 });
 
 const walletClient = createWalletClient({
@@ -57,19 +49,29 @@ const publicClient = createPublicClient({
 const keyManager = createFileSystemKeyManager('./data');
 
 const serverWallet = createWallet({
+  // @ts-expect-error - walletClient is not typed correctly
   walletClient,
+  // @ts-expect-error - publicClient is not typed correctly
   publicClient,
   sessionKeyManager: keyManager
 });
 
-// ==================== GAME STATE ====================
+// ==================== GAME CONSTANTS ====================
 
 const ENTRY_FEE = '0.01'; // 0.01 USDC per player
+const TOTAL_ROUNDS = 3;
+const ANSWER_TIMEOUT_MS = 5000;
+const ROUND_DELAY_MS = 1000;
+const LOBBY_RESET_DELAY_MS = 5000;
+const PRIZE_SPLIT = { first: 50, second: 30, third: 20 } as const;
+
 const QUESTIONS = [
   { question: 'What is 2+2?', answer: '4' },
   { question: 'What is the capital of France?', answer: 'Paris' },
   { question: 'Who created Bitcoin?', answer: 'Satoshi Nakamoto' },
 ];
+
+// ==================== GAME STATE ====================
 
 // Lobby state
 let lobby: LobbyState = {
@@ -109,31 +111,36 @@ const serverClient = createBetterNitroliteClient<TriviaGameSchema>({
 console.log('🚀 Starting server...');
 console.log(`📍 Server address: ${serverWallet.address}`);
 
-await serverClient.connect()
-  .then(() => console.log('✅ Connected to ClearNode'))
-  .catch(err => console.error('❌ Failed to connect:', err));
+// Try to connect to ClearNode and initialize channel (non-blocking)
+try {
+  await serverClient.connect();
+  console.log('✅ Connected to ClearNode');
 
-// Check and initialize channel
-const MIN_CHANNEL_BALANCE = parseUSDC('10'); // 10 USDC minimum
-const balances = await serverClient.getBalances();
+  // Check and initialize channel
+  const MIN_CHANNEL_BALANCE = parseUSDC('10'); // 10 USDC minimum
+  const balances = await serverClient.getBalances();
 
-console.log('💰 Server balances:');
-console.log(`  Wallet: ${formatUSDC(balances.wallet)} USDC`);
-console.log(`  Custody: ${formatUSDC(balances.custodyContract)} USDC`);
-console.log(`  Channel: ${formatUSDC(balances.channel)} USDC`);
-console.log(`  Ledger: ${formatUSDC(balances.ledger)} USDC`);
+  console.log('💰 Server balances:');
+  console.log(`  Wallet: ${formatUSDC(balances.wallet)} USDC`);
+  console.log(`  Custody: ${formatUSDC(balances.custodyContract)} USDC`);
+  console.log(`  Channel: ${formatUSDC(balances.channel)} USDC`);
+  console.log(`  Ledger: ${formatUSDC(balances.ledger)} USDC`);
 
-if (balances.channel === 0n) {
-  console.log(`📊 No channel found, creating with ${formatUSDC(MIN_CHANNEL_BALANCE)} USDC...`);
-  await serverClient.deposit(MIN_CHANNEL_BALANCE);
-  console.log('✅ Channel created');
-} else if (balances.channel < MIN_CHANNEL_BALANCE) {
-  throw new Error(
-    `Insufficient channel balance: ${formatUSDC(balances.channel)} ` +
-    `(need ${formatUSDC(MIN_CHANNEL_BALANCE)})`
-  );
-} else {
-  console.log(`✅ Channel exists with ${formatUSDC(balances.channel)} USDC`);
+  if (balances.channel === 0n) {
+    console.log(`📊 No channel found, creating with ${formatUSDC(MIN_CHANNEL_BALANCE)} USDC...`);
+    await serverClient.deposit(MIN_CHANNEL_BALANCE);
+    console.log('✅ Channel created');
+  } else if (balances.channel < MIN_CHANNEL_BALANCE) {
+    console.warn(
+      `⚠️  Low channel balance: ${formatUSDC(balances.channel)} ` +
+      `(recommended: ${formatUSDC(MIN_CHANNEL_BALANCE)})`
+    );
+  } else {
+    console.log(`✅ Channel exists with ${formatUSDC(balances.channel)} USDC`);
+  }
+} catch (err) {
+  console.error('⚠️  ClearNode unavailable - server starting in degraded mode');
+  console.error('   Game endpoints will not work until ClearNode is connected');
 }
 
 // ==================== GAME LOGIC ====================
@@ -164,7 +171,7 @@ async function startGame() {
     currentGame = {
       sessionId,
       currentRound: 0,
-      totalRounds: 3,
+      totalRounds: TOTAL_ROUNDS,
       scores: {},
       status: 'active',
     };
@@ -176,14 +183,14 @@ async function startGame() {
 
     // Send game start message
     await serverClient.sendMessage(sessionId, 'game_start', {
-      totalRounds: 3,
+      totalRounds: TOTAL_ROUNDS,
       entryFee: ENTRY_FEE,
     });
 
-    console.log('🎮 Game started! Playing 3 rounds...\n');
+    console.log(`🎮 Game started! Playing ${TOTAL_ROUNDS} rounds...\n`);
 
     // Play all rounds
-    for (let round = 1; round <= 3; round++) {
+    for (let round = 1; round <= TOTAL_ROUNDS; round++) {
       await playRound(sessionId, round);
     }
 
@@ -220,8 +227,8 @@ async function playRound(sessionId: string, roundNumber: number) {
     round: roundNumber,
   });
 
-  // Wait for all answers (5 seconds timeout)
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  // Wait for all answers
+  await new Promise(resolve => setTimeout(resolve, ANSWER_TIMEOUT_MS));
 
   // Determine winner (fastest correct answer)
   const correctAnswers = answerSubmissions
@@ -247,7 +254,7 @@ async function playRound(sessionId: string, roundNumber: number) {
   }
 
   // Small delay between rounds
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise(resolve => setTimeout(resolve, ROUND_DELAY_MS));
 }
 
 async function endGame(sessionId: string) {
@@ -273,12 +280,12 @@ async function endGame(sessionId: string) {
     scores: Object.fromEntries(sortedScores),
   });
 
-  // Distribute prizes (50/30/20 split)
-  const totalPot = parseUSDC(ENTRY_FEE) * 3n;
+  // Distribute prizes
+  const totalPot = parseUSDC(ENTRY_FEE) * BigInt(lobby.maxPlayers);
   const prizes = {
-    first: (totalPot * 50n) / 100n,
-    second: (totalPot * 30n) / 100n,
-    third: (totalPot * 20n) / 100n,
+    first: (totalPot * BigInt(PRIZE_SPLIT.first)) / 100n,
+    second: (totalPot * BigInt(PRIZE_SPLIT.second)) / 100n,
+    third: (totalPot * BigInt(PRIZE_SPLIT.third)) / 100n,
   };
 
   const firstPlaceAddr = sortedScores[0]?.[0] as Address;
@@ -305,7 +312,7 @@ async function endGame(sessionId: string) {
   currentGame.status = 'finished';
 
   // Reset lobby after a delay
-  setTimeout(resetLobby, 5000);
+  setTimeout(resetLobby, LOBBY_RESET_DELAY_MS);
 }
 
 function resetLobby() {
@@ -361,53 +368,58 @@ app.get('/server-balances', async (c) => {
 
 // Join game lobby
 app.post('/join-game', async (c) => {
-  const body = await c.req.json();
-  const playerAddress = body.playerAddress as Address;
+  try {
+    const body = await c.req.json();
+    const playerAddress = body.playerAddress as Address;
 
-  if (!playerAddress) {
-    return c.json({ error: 'playerAddress required' }, 400);
-  }
+    if (!playerAddress) {
+      return c.json({ error: 'playerAddress required' }, 400);
+    }
 
-  // Check if already in lobby
-  if (lobby.players.some(p => p.address === playerAddress)) {
-    return c.json(lobby);
-  }
+    // Check if already in lobby
+    if (lobby.players.some(p => p.address === playerAddress)) {
+      return c.json(lobby);
+    }
 
-  // Check if lobby full
-  if (lobby.players.length >= lobby.maxPlayers) {
-    return c.json({ error: 'Lobby full' }, 400);
-  }
+    // Check if lobby full
+    if (lobby.players.length >= lobby.maxPlayers) {
+      return c.json({ error: 'Lobby full' }, 400);
+    }
 
-  // Add player
-  lobby.players.push({
-    address: playerAddress,
-    joinedAt: Date.now(),
-  });
-
-  console.log(`🎮 Player joined: ${playerAddress.slice(0, 10)}... (${lobby.players.length}/${lobby.maxPlayers})`);
-
-  // If lobby full, prepare session
-  if (lobby.players.length === lobby.maxPlayers) {
-    lobby.status = 'collecting_signatures';
-
-    // Prepare session request
-    const sessionRequest = serverClient.prepareSession({
-      participants: [...lobby.players.map(p => p.address), serverWallet.address],
-      allocations: [
-        ...lobby.players.map(p => ({
-          participant: p.address,
-          asset: 'USDC',
-          amount: ENTRY_FEE
-        })),
-        { participant: serverWallet.address, asset: 'USDC', amount: '0' },
-      ],
+    // Add player
+    lobby.players.push({
+      address: playerAddress,
+      joinedAt: Date.now(),
     });
 
-    lobby.sessionRequest = sessionRequest;
-    console.log('📝 Session request prepared, waiting for signatures...');
-  }
+    console.log(`🎮 Player joined: ${playerAddress.slice(0, 10)}... (${lobby.players.length}/${lobby.maxPlayers})`);
 
-  return c.json(lobby);
+    // If lobby full, prepare session
+    if (lobby.players.length === lobby.maxPlayers) {
+      lobby.status = 'collecting_signatures';
+
+      // Prepare session request
+      const sessionRequest = serverClient.prepareSession({
+        participants: [...lobby.players.map(p => p.address), serverWallet.address],
+        allocations: [
+          ...lobby.players.map(p => ({
+            participant: p.address,
+            asset: 'USDC',
+            amount: ENTRY_FEE
+          })),
+          { participant: serverWallet.address, asset: 'USDC', amount: '0' },
+        ],
+      });
+
+      lobby.sessionRequest = sessionRequest;
+      console.log('📝 Session request prepared, waiting for signatures...');
+    }
+
+    return c.json(lobby);
+  } catch (err) {
+    console.error('Error in /join-game:', err);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
 });
 
 // Get lobby state
@@ -417,29 +429,34 @@ app.get('/lobby-state', (c) => {
 
 // Submit signature
 app.post('/submit-signature', async (c) => {
-  const body = await c.req.json();
-  const { playerAddress, signature } = body as SignatureSubmission;
+  try {
+    const body = await c.req.json();
+    const { playerAddress, signature } = body as SignatureSubmission;
 
-  if (!playerAddress || !signature) {
-    return c.json({ error: 'playerAddress and signature required' }, 400);
+    if (!playerAddress || !signature) {
+      return c.json({ error: 'playerAddress and signature required' }, 400);
+    }
+
+    signatures.set(playerAddress, signature);
+    console.log(`✍️  Signature received from ${playerAddress.slice(0, 10)}... (${signatures.size}/${lobby.maxPlayers})`);
+
+    // If all signatures collected, start game
+    if (signatures.size === lobby.maxPlayers && lobby.sessionRequest) {
+      lobby.status = 'starting';
+      console.log('🚀 All signatures collected, starting game...');
+
+      // Start game asynchronously
+      setTimeout(() => startGame(), 100);
+    }
+
+    return c.json({
+      received: signatures.size,
+      needed: lobby.maxPlayers
+    });
+  } catch (err) {
+    console.error('Error in /submit-signature:', err);
+    return c.json({ error: 'Internal server error' }, 500);
   }
-
-  signatures.set(playerAddress, signature);
-  console.log(`✍️  Signature received from ${playerAddress.slice(0, 10)}... (${signatures.size}/${lobby.maxPlayers})`);
-
-  // If all signatures collected, start game
-  if (signatures.size === lobby.maxPlayers && lobby.sessionRequest) {
-    lobby.status = 'starting';
-    console.log('🚀 All signatures collected, starting game...');
-
-    // Start game asynchronously
-    setTimeout(() => startGame(), 100);
-  }
-
-  return c.json({
-    received: signatures.size,
-    needed: lobby.maxPlayers
-  });
 });
 
 // Get game state
